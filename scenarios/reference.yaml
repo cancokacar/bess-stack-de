@@ -1,0 +1,29 @@
+# Reference (baseline) scenario.
+name: reference
+description: Baseline German BESS revenue-stacking case.
+
+battery:
+  power_mw: 10.0
+  energy_mwh: 20.0
+  round_trip_efficiency: 0.88
+  soc_min: 0.05
+  soc_max: 0.95
+  cycles_per_year_max: 500
+
+market:
+  country: DE
+  bidding_zone: DE-LU
+  year: 2025
+  timezone: Europe/Berlin
+  resolution_minutes: 15
+
+revenue_streams:
+  - day_ahead
+  - intraday
+  - frequency_containment_reserve
+
+finance:
+  capex_eur_per_kwh: 250.0
+  opex_eur_per_kw_year: 8.0
+  discount_rate: 0.07
+  project_lifetime_years: 15
