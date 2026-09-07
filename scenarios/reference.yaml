@@ -1,14 +1,42 @@
 # Reference (baseline) scenario.
+#
+# ALL VALUES ARE PLACEHOLDERS pending calibration against market data and
+# vendor quotes. Units are stated per field: power in MW, energy in MWh,
+# capacity prices in EUR/MW/h, energy prices in EUR/MWh.
+
 name: reference
-description: Baseline German BESS revenue-stacking case.
+description: >-
+  Baseline German BESS case: degradation-aware, rolling-horizon dispatch
+  co-optimizing day-ahead arbitrage, FCR capacity and aFRR capacity + energy,
+  reported as an annual revenue stack and a project-level IRR.
 
 battery:
-  power_mw: 10.0
-  energy_mwh: 20.0
-  round_trip_efficiency: 0.88
-  soc_min: 0.05
-  soc_max: 0.95
-  cycles_per_year_max: 500
+  power_mw: 10.0                    # charge/discharge rating at the POI
+  energy_mwh: 20.0                  # usable energy at beginning of life (2 h)
+  efficiency:
+    charge: 0.938                   # one-way; round-trip = charge * discharge
+    discharge: 0.938                # => ~0.88 round-trip
+    self_discharge_per_day: 0.001   # fraction of rated energy, idle
+  soc:
+    min: 0.05
+    max: 0.95
+    initial: 0.50
+  aux_load_mw: 0.05                 # BOP/HVAC parasitic draw while online
+
+degradation:
+  # Replaces the previous hard cycles-per-year cap: throughput carries a price
+  # in the objective, so the optimizer trades cycles against spread instead of
+  # being clipped at an arbitrary count.
+  model: throughput                 # throughput | rainflow
+  marginal_cost_eur_per_mwh: 4.0    # charged per MWh discharged
+  equivalent_full_cycles_to_eol: 6000
+  calendar_fade_per_year: 0.015     # fraction of BOL capacity, idle
+  cyclic_fade_per_full_cycle: 0.00008
+  end_of_life_capacity_fraction: 0.70
+  augmentation:
+    enabled: false
+    trigger_capacity_fraction: 0.80
+    cost_eur_per_kwh: 120.0
 
 market:
   country: DE
@@ -16,14 +44,83 @@ market:
   year: 2025
   timezone: Europe/Berlin
   resolution_minutes: 15
+  price_source: synthetic           # entsoe | smard | synthetic
+
+dispatch:
+  # Receding horizon: optimize over `horizon_hours`, commit `commit_step_hours`,
+  # roll forward carrying SoC and cumulative degradation across windows.
+  mode: rolling_horizon             # rolling_horizon | perfect_foresight
+  horizon_hours: 36
+  commit_step_hours: 4              # aligned to the 4 h reserve product blocks
+  forecast:
+    kind: perfect                   # perfect | persistence | ar1 | external
+    # Used only when kind != perfect.
+    price_error_sigma_eur_per_mwh: 12.0
+    seed: 42
+  solver:
+    name: highs                     # highs | cbc
+    mip_gap: 0.005
+    time_limit_s: 60
 
 revenue_streams:
-  - day_ahead
-  - intraday
-  - frequency_containment_reserve
+  # NOTE: this was a flat list of stream names; it is now a mapping so each
+  # stream carries its own product structure and prices.
+  day_ahead:
+    enabled: true
+    product_resolution_minutes: 60
+    spread_haircut: 0.0             # fraction shaved off captured spread
+    fees_eur_per_mwh: 0.0
+
+  fcr:
+    enabled: true
+    # Symmetric capacity product; no energy settlement.
+    symmetric: true
+    block_hours: 4
+    min_bid_mw: 1.0
+    reserve_energy_hours: 0.25      # headroom held per MW awarded
+    capacity_price_eur_per_mw_h: 12.0
+
+  afrr:
+    enabled: true
+    # Separate positive and negative products: capacity payment plus settled
+    # energy on activation.
+    block_hours: 4
+    min_bid_mw: 1.0
+    reserve_energy_hours: 1.0       # headroom held per MW awarded
+    positive:
+      capacity_price_eur_per_mw_h: 8.0
+      energy_price_eur_per_mwh: 85.0
+      activation_rate: 0.08         # expected fraction of awarded MW activated
+    negative:
+      capacity_price_eur_per_mw_h: 5.0
+      energy_price_eur_per_mwh: -15.0   # negative = paid to absorb
+      activation_rate: 0.10
+
+grid:
+  connection_limit_mw: 10.0
+  # Storage charging has been exempt from grid fees under German law; treat
+  # this as an assumption to verify for the modelled year, not a settled fact.
+  grid_fee_exemption: true
+  charging_fees_eur_per_mwh: 0.0
+  discharging_fees_eur_per_mwh: 0.0
 
 finance:
   capex_eur_per_kwh: 250.0
+  capex_fixed_eur: 0.0              # development, interconnection, EPC lumps
   opex_eur_per_kw_year: 8.0
-  discount_rate: 0.07
+  opex_inflation_per_year: 0.02
+  discount_rate: 0.07               # project WACC, real
   project_lifetime_years: 15
+  residual_value_fraction: 0.0
+  tax_rate: 0.30
+  debt:
+    # Disabled => IRR is reported unlevered (project-level).
+    enabled: false
+    share_of_capex: 0.60
+    interest_rate: 0.05
+    tenor_years: 10
+
+outputs:
+  revenue_stack_by_stream: true
+  annual_cashflow: true
+  metrics: [npv, irr, payback_years, lcos_eur_per_mwh]
