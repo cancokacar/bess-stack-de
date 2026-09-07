@@ -105,18 +105,31 @@ grid:
   discharging_fees_eur_per_mwh: 0.0
 
 finance:
+  # BASIS IS DECIDED ONCE, HERE. Every monetary field in this file is
+  # interpreted on this basis, including the revenue path. Mixing real and
+  # nominal is the most common silent error in models of this kind, so
+  # changing `basis` means revisiting discount_rate, opex escalation and
+  # debt.interest_rate together, not one at a time.
+  basis: real                       # real | nominal
+  inflation_per_year: 0.02          # used only to convert between bases
+
   capex_eur_per_kwh: 250.0
   capex_fixed_eur: 0.0              # development, interconnection, EPC lumps
   opex_eur_per_kw_year: 8.0
-  opex_inflation_per_year: 0.02
-  discount_rate: 0.07               # project WACC, real
-  project_lifetime_years: 15
+  # Cost growth ABOVE inflation. Under `basis: nominal` this field must instead
+  # carry full escalation (inflation + real growth).
+  opex_real_escalation_per_year: 0.0
+  discount_rate: 0.07               # project WACC, stated on `basis` (real)
+  # 20 years to match the section 118(6) EnWG exemption window; a shorter
+  # horizon cannot show the exemption expiring.
+  project_lifetime_years: 20
   residual_value_fraction: 0.0
   tax_rate: 0.30
   debt:
     # Disabled => IRR is reported unlevered (project-level).
     enabled: false
     share_of_capex: 0.60
+    # Lending rates are quoted nominal: deflate before use under `basis: real`.
     interest_rate: 0.05
     tenor_years: 10
 
