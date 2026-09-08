@@ -41,6 +41,10 @@ Simplifications inside the modelled scope that a reader should price in:
 - **Grid fee exemption is an assumption.** `grid.grid_fee_exemption` is set true
   on the basis of the storage exemption under section 118(6) EnWG. It is a
   material IRR driver and must be verified for the modelled year.
+- **Tax is a single blended rate.** German trade tax varies with the municipal
+  Hebesatz, and the depreciation life is a placeholder rather than a confirmed
+  AfA figure, so `irr_post_tax` will move once the site and tax life are fixed.
+  Both IRRs are reported by name; neither is quoted as plain "IRR".
 
 ## Layout
 
