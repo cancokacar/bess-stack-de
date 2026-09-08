@@ -277,15 +277,41 @@ class DayAhead:
 @dataclass(frozen=True)
 class Grid:
     connection_limit_mw: float
-    grid_fee_exemption: bool
+    # None => never exempt. An end year rather than a flag, so that a run
+    # crossing the year the section 118(6) EnWG exemption lapses picks up the
+    # successor charges instead of carrying the exemption forever.
+    grid_fee_exemption_until_year: int | None
+    post_exemption_capacity_charge_eur_per_kw_year: float
+    post_exemption_charging_fees_eur_per_mwh: float
     charging_fees_eur_per_mwh: float
     discharging_fees_eur_per_mwh: float
 
+    def exempt_in(self, year: int) -> bool:
+        """Whether network charges on charging are waived in `year`."""
+        return (
+            self.grid_fee_exemption_until_year is not None
+            and year <= self.grid_fee_exemption_until_year
+        )
+
+    def charging_fees_in(self, year: int) -> float:
+        """Per-MWh charging fees applicable in `year`, in EUR/MWh."""
+        if self.exempt_in(year):
+            return self.charging_fees_eur_per_mwh
+        return self.charging_fees_eur_per_mwh + self.post_exemption_charging_fees_eur_per_mwh
+
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Grid:
+        until = d.get("grid_fee_exemption_until_year")
+        post = d.get("post_exemption", {})
         return cls(
             connection_limit_mw=float(_require(d, "connection_limit_mw", "grid")),
-            grid_fee_exemption=bool(d.get("grid_fee_exemption", False)),
+            grid_fee_exemption_until_year=None if until is None else int(until),
+            post_exemption_capacity_charge_eur_per_kw_year=float(
+                post.get("capacity_charge_eur_per_kw_year", 0.0)
+            ),
+            post_exemption_charging_fees_eur_per_mwh=float(
+                post.get("charging_fees_eur_per_mwh", 0.0)
+            ),
             charging_fees_eur_per_mwh=float(d.get("charging_fees_eur_per_mwh", 0.0)),
             discharging_fees_eur_per_mwh=float(d.get("discharging_fees_eur_per_mwh", 0.0)),
         )

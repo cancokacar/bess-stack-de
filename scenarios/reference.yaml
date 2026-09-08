@@ -97,10 +97,18 @@ revenue_streams:
     symmetric: true
     block_hours: 4
     min_bid_mw: 1.0
-    # German FCR prequalification requires full activation to be sustainable
-    # for 30 minutes in both directions, hence 0.5 h. Understating this lets the
-    # optimizer sell the same MW to reserve and arbitrage at once.
-    reserve_energy_hours: 0.5       # headroom held per MW awarded
+    # PER DIRECTION, not the total reserved band. FCR here is symmetric, so an
+    # award of A MW holds A * reserve_energy_hours above soc_min AND the same
+    # below soc_max; the band consumed is twice this figure.
+    #
+    # 15 minutes follows directly from Art. 156(9) sentence 3 SO-VO (Reg. (EU)
+    # 2017/1485): units with limited energy reservoirs must sustain full
+    # activation for at least 15 minutes. A TSO may set a longer period, capped
+    # at 30 minutes; the German TSOs applied for 30 and the Bundesnetzagentur
+    # refused it (BK6-17-234, 02.05.2019), so 15 minutes stands. Do not raise
+    # this to 0.5 on the belief that 30 minutes is required -- it is not, and
+    # the doubled headroom would suppress arbitrage for no regulatory reason.
+    reserve_energy_hours: 0.25      # headroom per MW awarded, each direction
     capacity_price_eur_per_mw_h: 12.0
 
   afrr:
@@ -121,9 +129,33 @@ revenue_streams:
 
 grid:
   connection_limit_mw: 10.0
-  # Storage charging has been exempt from grid fees under German law; treat
-  # this as an assumption to verify for the modelled year, not a settled fact.
-  grid_fee_exemption: true
+  # Section 118(6) EnWG exempts storage from network charges on the energy
+  # drawn to store, for 20 years from commissioning, where commissioning falls
+  # in the window closing 4 August 2029. Stated as an end year rather than a
+  # boolean, because a boolean cannot lapse and this exemption is not
+  # permanent. Inclusive: the last year in which charging is exempt. A 2025
+  # commissioning gives 2025..2044, which is exactly the modelled life, so the
+  # reference case never exercises a post-exemption year. Lowering this value
+  # is how that risk gets stressed.
+  #
+  # Treat the end year as a risk, not a fact. Section 118(6) sentence 12 lets
+  # the Bundesnetzagentur deviate from the provision including its temporal
+  # scope, and in the AgNes proceeding (Orientierungspunkte, 30.01.2026) it
+  # states that a full exemption is not sustainable under EU law and that
+  # ending it early at a cut-off date would be legally possible. Protection of
+  # legitimate expectations for assets already commissioned is under
+  # examination, not settled. A cut-off before 2045 is a live scenario.
+  grid_fee_exemption_until_year: 2044
+  # Charges once the exemption lapses. Kept separate from the flat fees below
+  # because the successor regime has a different shape: a capacity charge plus
+  # an energy charge that BNetzA is considering levying only on storage losses,
+  # netting off energy returned to the grid. Both are placeholders -- the AgNes
+  # paper proposes a structure and states no figures. Numbers circulating in
+  # commentary are not regulatory and do not belong here.
+  post_exemption:
+    capacity_charge_eur_per_kw_year: 0.0
+    charging_fees_eur_per_mwh: 0.0
+  # Fees that apply irrespective of the exemption.
   charging_fees_eur_per_mwh: 0.0
   discharging_fees_eur_per_mwh: 0.0
 

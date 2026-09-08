@@ -38,9 +38,21 @@ Simplifications inside the modelled scope that a reader should price in:
 - **Reserve market price provenance is unresolved.** `market.price_source`
   covers day-ahead only; FCR and aFRR clearing results come from a separate
   source and are currently placeholders.
-- **Grid fee exemption is an assumption.** `grid.grid_fee_exemption` is set true
-  on the basis of the storage exemption under section 118(6) EnWG. It is a
-  material IRR driver and must be verified for the modelled year.
+- **The grid fee exemption may not survive the horizon.**
+  `grid.grid_fee_exemption_until_year` is set to 2044, the last exempt year of
+  the 20 years from a 2025 commissioning under section 118(6) EnWG — exactly
+  the modelled life, so the reference case never pays a post-exemption charge.
+  Lowering it is how the risk gets stressed. That end year is a risk rather
+  than a fact: sentence 12 of the provision empowers the Bundesnetzagentur to
+  deviate from it, including its temporal scope, and in the AgNes proceeding
+  (Orientierungspunkte, 30 January 2026) the agency states that a full
+  exemption is not sustainable under EU law and that ending it early at a
+  cut-off date would be legally possible, with protection of legitimate
+  expectations still under examination. The successor regime is expected to be
+  a capacity charge plus an energy charge levied only on storage losses; the
+  `grid.post_exemption` fields carry that structure but are zeroed, because the
+  agency has published a design and no figures. This is a material IRR driver
+  and the single assumption most worth tracking.
 - **Tax is a single blended rate.** German trade tax varies with the municipal
   Hebesatz, and the depreciation life is a placeholder rather than a confirmed
   AfA figure, so `irr_post_tax` will move once the site and tax life are fixed.
