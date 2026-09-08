@@ -27,16 +27,31 @@ degradation:
   # Replaces the previous hard cycles-per-year cap: throughput carries a price
   # in the objective, so the optimizer trades cycles against spread instead of
   # being clipped at an arbitrary count.
+  # rainflow is path-dependent and not MILP-representable; v1 commits to
+  # throughput and keeps the other name only as a forward marker.
   model: throughput                 # throughput | rainflow
   marginal_cost_eur_per_mwh: 4.0    # charged per MWh discharged
-  equivalent_full_cycles_to_eol: 6000
   calendar_fade_per_year: 0.015     # fraction of BOL capacity, idle
-  cyclic_fade_per_full_cycle: 0.00008
+  cyclic_fade_per_full_cycle: 0.00005
   end_of_life_capacity_fraction: 0.70
+  # Identity that must hold whenever the three fields above are edited:
+  #   equivalent_full_cycles_to_eol
+  #     == (1 - end_of_life_capacity_fraction) / cyclic_fade_per_full_cycle
+  #     == 0.30 / 0.00005 == 6000
+  # Cyclic fade only. Calendar fade is additive on top, so real end of life
+  # arrives before 6000 equivalent full cycles are reached.
+  equivalent_full_cycles_to_eol: 6000
   augmentation:
-    enabled: false
+    # Enabled in the reference case by necessity, not preference: 1.5 %/y
+    # calendar fade alone leaves 0.985^20 ~= 0.74 of BOL capacity at year 20,
+    # and any realistic cycling crosses the 0.70 threshold years earlier. With
+    # augmentation disabled, finance.project_lifetime_years must be shortened
+    # to match, otherwise the model runs past its own end of life.
+    enabled: true
     trigger_capacity_fraction: 0.80
-    cost_eur_per_kwh: 120.0
+    restore_to_capacity_fraction: 1.00  # usable energy just after an event
+    max_events: 2
+    cost_eur_per_kwh: 120.0             # on added energy, on finance.basis
 
 market:
   country: DE
@@ -77,7 +92,10 @@ revenue_streams:
     symmetric: true
     block_hours: 4
     min_bid_mw: 1.0
-    reserve_energy_hours: 0.25      # headroom held per MW awarded
+    # German FCR prequalification requires full activation to be sustainable
+    # for 30 minutes in both directions, hence 0.5 h. Understating this lets the
+    # optimizer sell the same MW to reserve and arbitrage at once.
+    reserve_energy_hours: 0.5       # headroom held per MW awarded
     capacity_price_eur_per_mw_h: 12.0
 
   afrr:

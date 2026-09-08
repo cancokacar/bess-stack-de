@@ -12,6 +12,10 @@ dependencies = [
     "numpy",
     "pandas",
     "pyyaml",
+    # MILP modelling layer. PuLP bundles CBC and, from 2.8, drives HiGHS via
+    # highspy, covering both names allowed in dispatch.solver.name.
+    "pulp>=2.8",
+    "highspy>=1.7",
 ]
 
 [project.optional-dependencies]
