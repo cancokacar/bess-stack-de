@@ -12,9 +12,10 @@ dependencies = [
     "numpy",
     "pandas",
     "pyyaml",
-    # MILP modelling layer. PuLP bundles CBC and, from 2.8, drives HiGHS via
-    # highspy, covering both names allowed in dispatch.solver.name.
-    "pulp>=2.8",
+    # MILP modelling layer. PuLP bundles CBC and drives HiGHS via highspy,
+    # covering both names allowed in dispatch.solver.name. Floor is 3.3 for
+    # LpProblem.add_variable, the API that survives PuLP 4.0.
+    "pulp>=3.3",
     "highspy>=1.7",
 ]
 

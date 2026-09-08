@@ -67,6 +67,11 @@ dispatch:
   mode: rolling_horizon             # rolling_horizon | perfect_foresight
   horizon_hours: 36
   commit_step_hours: 4              # aligned to the 4 h reserve product blocks
+  # State of charge required at the far end of each optimisation window. Without
+  # it the optimizer empties the battery into the last window step, because
+  # stored energy has no value past the horizon. The constraint binds at the
+  # horizon, not inside the committed region, so it shapes end effects only.
+  terminal_soc_fraction: 0.50
   forecast:
     kind: perfect                   # perfect | persistence | ar1 | external
     # Used only when kind != perfect.
