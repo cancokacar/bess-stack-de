@@ -155,8 +155,16 @@ src/bess_stack/
 └── finance/   # cashflow, NPV/IRR, financing assumptions
 scenarios/     # scenario definitions (YAML)
 scripts/       # measurement and reporting entry points, run by hand
+docs/          # written model: formulation.tex is canonical, .md is generated
 tests/
 ```
+
+The optimization model is written out in [docs/formulation.tex](docs/formulation.tex):
+notation, objective, and every constraint, each mapped to the scenario field it
+reads and the line of `solve_window` it comes from. Section 2 is what runs;
+section 3 formulates the FCR and aFRR products that the schema defines and the
+code does not yet read. `docs/formulation.md` is generated from the `.tex` and is
+there for reading in the browser; the `.tex` is the one to edit.
 
 ## Install
 

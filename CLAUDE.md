@@ -10,6 +10,8 @@ pip install -e ".[dev]"            # first setup; .venv/ already has this
 .venv/bin/pytest tests/test_dispatch.py::test_never_charges_and_discharges_at_once
 .venv/bin/pytest -k degradation -v # by name substring
 .venv/bin/ruff check src tests     # lint; not part of the pytest run
+{ printf '<!-- GENERATED FILE. Source: docs/formulation.tex -- edit that, not this.\n     Regenerate with the pandoc command in CLAUDE.md.\n     Equation numbers do not survive the conversion; the numbers used in the prose\n     ((2.1), (2.4), ...) match the compiled PDF, not anything numbered below. -->\n\n'; \
+  pandoc -f latex -t gfm --mathjax docs/formulation.tex; } > docs/formulation.md
 .venv/bin/python scripts/measure_grid_fee_error.py --check   # ~6 min, not in pytest
 .venv/bin/python scripts/run_scenario.py scenarios/reference.yaml            # ~81 s
 .venv/bin/python scripts/run_scenario.py scenarios/reference.yaml --days 7   # ~2 s
@@ -98,6 +100,16 @@ numbers, including the direction of each bias — revenue understated, throughpu
 and cycle count overstated. When you take a shortcut like this, measure it the
 same way, on a full year rather than a sample month (January has the narrowest
 spreads in the synthetic series, so extrapolating it distorts the result).
+
+**The formulation document is part of the model's definition.** `solve_window`
+and [docs/formulation.tex](docs/formulation.tex) state the same MILP in two
+languages, and a change to the objective or the constraint set updates both in
+the same commit. The document's parameter table names the scenario field behind
+every symbol, so a renamed config field makes the table wrong. Section 2 is
+implemented and section 3 is not; that boundary moves only when code moves.
+Never hand-edit `docs/formulation.md` — it is generated, and the regeneration
+command above will discard the edit. No TeX engine is installed here, so the
+`.tex` cannot be compiled or visually checked locally; that is the user's step.
 
 **Commit messages carry the reasoning**, not just the change: what was ambiguous
 or wrong, why the chosen fix beats the alternative, and which numbers are
