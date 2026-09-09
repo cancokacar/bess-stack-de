@@ -19,6 +19,16 @@ outputs/
 *.parquet
 *.csv
 
+# LaTeX build artifacts. No *.pdf rule: docs/formulation.pdf is tracked
+# deliberately, so the formulation reads on GitHub without a TeX install.
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
+
 # Env / editors
 .env
 .DS_Store
