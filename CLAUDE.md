@@ -1,0 +1,93 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Commands
+
+```bash
+pip install -e ".[dev]"            # first setup; .venv/ already has this
+.venv/bin/pytest                   # full suite, ~4 s
+.venv/bin/pytest tests/test_dispatch.py::test_never_charges_and_discharges_at_once
+.venv/bin/pytest -k degradation -v # by name substring
+.venv/bin/ruff check src tests     # lint; not part of the pytest run
+```
+
+Running a full synthetic year of dispatch takes ~81 s and 35,040 steps. Tests
+use 1–4 day windows to stay fast; do the same for anything iterative.
+
+## Scope discipline
+
+This project deliberately models one narrow artifact, stated in the first
+paragraph of the README. Intraday continuous trading, imbalance/reBAP exposure,
+multi-asset portfolios and AC/DC topology detail are **out of scope by
+decision**, not by omission — the README's "Out of scope for v1" section records
+why each was cut. Do not add them. If a change starts to look like a
+general-purpose energy optimizer, it has gone wrong.
+
+## Architecture
+
+Pipeline: `config.Scenario` (validated YAML) → `data.prices` (price series) →
+`model.dispatch` (rolling-horizon MILP) → `finance.*` (cashflow adjustments).
+
+**`config.py` is the single validation gate.** `Scenario.from_dict` always calls
+`validate()`, so there is no way to construct an unvalidated scenario. Invariants
+that `scenarios/reference.yaml` documents in comments are *enforced* here — most
+notably the cycles-to-end-of-life identity, which ties
+`cyclic_fade_per_full_cycle`, `end_of_life_capacity_fraction` and
+`equivalent_full_cycles_to_eol` together. Editing one of those three numbers
+without the others fails at load.
+
+**Unimplemented options raise rather than silently degrade.** The scenario schema
+advertises `degradation.model: rainflow`, `dispatch.forecast.kind` other than
+`perfect`, and `market.price_source: entsoe | smard`. None exist. Each raises a
+clear error naming why. Keep that pattern when adding options ahead of
+implementations.
+
+**The MILP binary is load-bearing.** `solve_window` uses one binary per step to
+forbid simultaneous charge and discharge. Do not relax this to an LP: at
+sufficiently negative prices the relaxation charges and discharges at once to
+burn energy through round-trip losses at zero net cost, so it can keep buying
+while full. Two other structural details: day-ahead power is held constant within
+each hourly product block (the same machinery the 4 h reserve blocks will need),
+and `dispatch.terminal_soc_fraction` exists because without it the optimizer
+empties the battery into the last step of every window.
+
+**What is not built yet.** FCR and aFRR appear in the scope sentence and the
+scenario schema but not in `model.dispatch` — day-ahead is the only stream
+optimised. `finance/` contains only `grid_fees.py`; nothing computes the NPV or
+IRR metrics that `outputs.metrics` names.
+
+## Conventions
+
+These cost real effort to establish and are easy to break unknowingly.
+
+**Every scenario value is a placeholder** pending calibration. Comments in
+`reference.yaml` distinguish fact from assumption from risk, and that distinction
+is the point — e.g. the section 118(6) EnWG grid fee exemption is stated as an
+end year rather than a boolean precisely because a boolean cannot lapse. Do not
+quietly promote a placeholder to a settled figure, and do not invent regulatory
+numbers that the regulator has not published.
+
+**Decide a basis once, then honour it.** `finance.basis` fixes real vs nominal
+for every monetary field in the file. IRR is always reported as `irr_pre_tax` or
+`irr_post_tax` — never a bare `irr`, because a reader assumes whichever one you
+did not mean. `discount_rate` is a post-tax WACC, which is why the reported NPV
+is post-tax.
+
+**Validation must be honest about what it proves.** The augmentation check in
+`Degradation.validate` can only test calendar fade, because cyclic fade depends
+on the cycle count, which is an outcome of dispatch rather than an input to it. A
+test documents that boundary rather than leaving the check looking stronger than
+it is. Prefer this to a check that quietly overclaims.
+
+**Measure approximations; do not assert them.** `finance/grid_fees.py` applies
+network charges to an already-solved dispatch instead of re-solving per year. Its
+error is measured against a re-solved run and recorded in the README with
+numbers, including the direction of each bias — revenue understated, throughput
+and cycle count overstated. When you take a shortcut like this, measure it the
+same way, on a full year rather than a sample month (January has the narrowest
+spreads in the synthetic series, so extrapolating it distorts the result).
+
+**Commit messages carry the reasoning**, not just the change: what was ambiguous
+or wrong, why the chosen fix beats the alternative, and which numbers are
+placeholders. See `git log` for the established shape.
