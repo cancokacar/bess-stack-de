@@ -10,6 +10,7 @@ pip install -e ".[dev]"            # first setup; .venv/ already has this
 .venv/bin/pytest tests/test_dispatch.py::test_never_charges_and_discharges_at_once
 .venv/bin/pytest -k degradation -v # by name substring
 .venv/bin/ruff check src tests     # lint; not part of the pytest run
+.venv/bin/python scripts/measure_grid_fee_error.py --check   # ~6 min, not in pytest
 ```
 
 Running a full synthetic year of dispatch takes ~81 s and 35,040 steps. Tests

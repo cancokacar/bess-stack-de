@@ -72,6 +72,16 @@ Simplifications inside the modelled scope that a reader should price in:
   The error is exactly zero while the exemption holds, which is the whole of the
   reference case, so nothing today depends on it. Re-solve per year before
   anything does.
+  Those figures are reproducible, not remembered:
+  `scripts/measure_grid_fee_error.py` regenerates them in about six minutes, and
+  `--check` fails if they have drifted from what this paragraph claims. Two
+  conditions in that script are load-bearing. It measures a full year, because
+  January has the narrowest spreads in the synthetic series and a fee bites
+  hardest there, so a sample month overstates the error. And it solves at
+  `mip_gap` 0 rather than the scenario's 0.005, because a 0.5 % optimality gap is
+  the same order as the smallest error being measured — at the default gap the
+  two runs could sit at opposite edges of their tolerances and manufacture a
+  difference that is not there.
 
 - **Tax is a single blended rate.** German trade tax varies with the municipal
   Hebesatz, and the depreciation life is a placeholder rather than a confirmed
