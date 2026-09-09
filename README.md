@@ -92,10 +92,12 @@ Simplifications inside the modelled scope that a reader should price in:
 
 ```
 src/bess_stack/
+├── cli.py     # run a scenario, print the revenue summary
 ├── data/      # market/price data loading and preparation
 ├── model/     # dispatch and revenue-stacking model
 └── finance/   # cashflow, NPV/IRR, financing assumptions
 scenarios/     # scenario definitions (YAML)
+scripts/       # measurement and reporting entry points, run by hand
 tests/
 ```
 
@@ -107,8 +109,44 @@ pip install -e ".[dev]"
 
 ## Usage
 
-```python
-from bess_stack import __version__
+One scenario in, one revenue summary out:
+
+```bash
+.venv/bin/python scripts/run_scenario.py scenarios/reference.yaml            # ~81 s
+.venv/bin/python scripts/run_scenario.py scenarios/reference.yaml --days 7   # ~2 s
 ```
 
-Scenarios live in `scenarios/`; `reference.yaml` is the baseline case.
+`bess-stack-run scenarios/reference.yaml` is the same code, installed as a console
+script; it appears once `pip install -e ".[dev]"` has been re-run, because the
+installer is what generates it.
+
+Abbreviated output for the reference case, measured rather than illustrative:
+
+```
+Dispatch
+  gross revenue                473,374 EUR
+  degradation cost              46,104 EUR
+  net revenue                  427,270 EUR
+  energy discharged             11,526 MWh
+  energy charged                13,565 MWh
+  equivalent full cycles         576.3
+```
+
+The full output carries four caveats, and they are the point of the command rather
+than decoration on it:
+
+- **Day-ahead only.** `revenue_streams.fcr` and `revenue_streams.afrr` are enabled in
+  the reference scenario but `model.dispatch` does not implement them, so the figures
+  are the day-ahead leg alone and understate the stack the scenario describes.
+- **No return metrics.** Nothing in `finance/` computes the `outputs.metrics` the
+  scenario names, so this stops at annual net revenue. That number is not a return.
+- **Synthetic prices.** `market.price_source` is `synthetic`; `entsoe` and `smard`
+  raise. The figures measure the price generator, not the German market.
+- **Short runs are not annualised.** `--days N` models the first N days, which start
+  in January — the narrowest spreads in the synthetic series — so pro-rating a short
+  run understates the year. A week pro-rates to about 310,000 EUR against the
+  427,270 measured above.
+
+Scenarios live in `scenarios/`; `reference.yaml` is the baseline case. A bad path, a
+malformed file or an inconsistent scenario exits 1 with one line on stderr; an
+out-of-range `--days` exits 2.

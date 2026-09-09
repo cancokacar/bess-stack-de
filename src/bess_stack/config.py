@@ -289,6 +289,15 @@ class DayAhead:
         )
 
     def validate(self, market: Market) -> None:
+        # Every other field on this dataclass reaches dispatch.solve_window; `enabled`
+        # did not, so a scenario declaring the stream off still ran it and reported the
+        # revenue. Rejecting it here keeps the flag honest without dispatch having to
+        # carry a branch it can never usefully take.
+        if not self.enabled:
+            raise ScenarioError(
+                "day_ahead.enabled is false, but day-ahead is the only stream "
+                "model.dispatch implements; disabling it would model nothing"
+            )
         if self.product_resolution_minutes % market.resolution_minutes != 0:
             raise ScenarioError(
                 f"day_ahead.product_resolution_minutes {self.product_resolution_minutes} is not a "

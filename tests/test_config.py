@@ -120,3 +120,16 @@ def test_marginal_cost_far_below_the_discounted_band_is_not_flagged(raw):
     cheap = copy.deepcopy(raw)
     cheap["degradation"]["marginal_cost_eur_per_mwh"] = 0.5
     assert Scenario.from_dict(cheap).degradation.marginal_cost_eur_per_mwh == 0.5
+
+
+def test_disabling_day_ahead_is_rejected(raw):
+    """The only stream dispatch implements cannot be switched off.
+
+    `enabled` was the one DayAhead field no consumer read, so a scenario declaring the
+    stream off still ran day-ahead dispatch and reported its revenue. Proves the flag is
+    enforced, not merely parsed.
+    """
+    off = copy.deepcopy(raw)
+    off["revenue_streams"]["day_ahead"]["enabled"] = False
+    with pytest.raises(ScenarioError, match="day_ahead.enabled"):
+        Scenario.from_dict(off)

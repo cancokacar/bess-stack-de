@@ -25,6 +25,12 @@ dev = [
     "ruff",
 ]
 
+# Generated into the environment's bin/ at install time, so it appears only after a
+# reinstall. scripts/run_scenario.py is the same code and needs no reinstall, which is
+# why CLAUDE.md documents that form first.
+[project.scripts]
+bess-stack-run = "bess_stack.cli:main"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/bess_stack"]
 
