@@ -78,3 +78,45 @@ def test_missing_field_names_its_path(raw):
     del broken["battery"]["power_mw"]
     with pytest.raises(ScenarioError, match="battery.power_mw"):
         Scenario.from_dict(broken)
+
+
+def test_marginal_cost_above_replacement_is_rejected(raw):
+    """4.0 passes against a 6.00 bound; charging more than replacement does not."""
+    broken = copy.deepcopy(raw)
+    broken["degradation"]["marginal_cost_eur_per_mwh"] = 7.0
+    with pytest.raises(ScenarioError, match="above the 6.00 EUR/MWh"):
+        Scenario.from_dict(broken)
+
+
+def test_marginal_cost_at_the_bound_is_accepted(raw):
+    at_bound = copy.deepcopy(raw)
+    at_bound["degradation"]["marginal_cost_eur_per_mwh"] = 6.0
+    assert Scenario.from_dict(at_bound).degradation.marginal_cost_eur_per_mwh == 6.0
+
+
+def test_marginal_cost_bound_tracks_the_augmentation_price(raw):
+    """The bound is derived, not hardcoded: doubling the augmentation price doubles it."""
+    dearer = copy.deepcopy(raw)
+    dearer["degradation"]["augmentation"]["cost_eur_per_kwh"] = 240.0
+    dearer["degradation"]["marginal_cost_eur_per_mwh"] = 7.0
+    assert Scenario.from_dict(dearer).degradation.marginal_cost_eur_per_mwh == 7.0
+
+
+def test_marginal_cost_is_unbounded_when_augmentation_is_disabled(raw):
+    """Deliberately scoped: without augmentation the basis is finance.capex_eur_per_kwh,
+    which config.py does not read, so no bound is asserted rather than a wrong one."""
+    unbounded = copy.deepcopy(raw)
+    unbounded["degradation"]["augmentation"]["enabled"] = False
+    unbounded["degradation"]["marginal_cost_eur_per_mwh"] = 7.0
+    unbounded["finance"]["project_lifetime_years"] = 10  # keep calendar fade in bounds
+    assert Scenario.from_dict(unbounded).degradation.marginal_cost_eur_per_mwh == 7.0
+
+
+def test_marginal_cost_far_below_the_discounted_band_is_not_flagged(raw):
+    """Documents what this check does NOT prove. The discounted band is 3.82-4.41
+    EUR/MWh, but the lower end depends on the augmentation date, which depends on
+    the cycle count, which is an outcome of dispatch. So 0.5 loads without complaint
+    even though it under-prices throughput badly."""
+    cheap = copy.deepcopy(raw)
+    cheap["degradation"]["marginal_cost_eur_per_mwh"] = 0.5
+    assert Scenario.from_dict(cheap).degradation.marginal_cost_eur_per_mwh == 0.5

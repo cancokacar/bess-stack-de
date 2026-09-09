@@ -69,11 +69,19 @@ def test_power_never_exceeds_the_binding_limit(scenario):
 
 
 def test_degradation_cost_suppresses_marginal_cycling(raw):
-    """The point of pricing throughput: a dearer cycle is a cycle not taken."""
+    """The point of pricing throughput: a dearer cycle is a cycle not taken.
+
+    400 EUR/MWh is far above the sawtooth spread, so it suppresses cycling
+    outright. It also exceeds the replacement-cost bound in Degradation.validate,
+    which is why the augmentation price moves with it: the two are tied by that
+    invariant, so an absurd marginal cost needs the absurd replacement price that
+    would justify it rather than a physically impossible scenario.
+    """
     cheap = copy.deepcopy(raw)
     cheap["degradation"]["marginal_cost_eur_per_mwh"] = 0.0
     dear = copy.deepcopy(raw)
     dear["degradation"]["marginal_cost_eur_per_mwh"] = 400.0
+    dear["degradation"]["augmentation"]["cost_eur_per_kwh"] = 8000.0  # bound: 0.05 * 8000
 
     cheap_scenario = Scenario.from_dict(cheap)
     prices = sawtooth(cheap_scenario, days=2, low=40.0, high=90.0)

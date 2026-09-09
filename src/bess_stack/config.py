@@ -133,6 +133,30 @@ class Degradation:
         if self.marginal_cost_eur_per_mwh < 0:
             raise ScenarioError("degradation.marginal_cost_eur_per_mwh must not be negative")
 
+        # Undiscounted cost of making good the capacity one cycle consumes.
+        # Battery energy cancels: fade per cycle is a fraction of beginning-of-life
+        # capacity, and one equivalent full cycle discharges exactly that.
+        #
+        # Bounded above only. The lower end would need a discount factor keyed to
+        # the augmentation date, which depends on the cycle count, which is an
+        # outcome of dispatch rather than an input to it. Passing this proves the
+        # value is not above any defensible basis, not that it is right.
+        #
+        # Skipped when augmentation is disabled: the replacement basis is then
+        # finance.capex_eur_per_kwh, which this loader does not read.
+        if self.augmentation.enabled:
+            bound = (
+                self.cyclic_fade_per_full_cycle * self.augmentation.cost_eur_per_kwh * 1000.0
+            )
+            if self.marginal_cost_eur_per_mwh > bound + 1e-9:
+                raise ScenarioError(
+                    f"degradation.marginal_cost_eur_per_mwh is {self.marginal_cost_eur_per_mwh}, "
+                    f"above the {bound:.2f} EUR/MWh it costs to make good the capacity one cycle "
+                    f"consumes ({self.cyclic_fade_per_full_cycle} fade per cycle * "
+                    f"{self.augmentation.cost_eur_per_kwh} EUR/kWh * 1000). Charging more than "
+                    "replacement has no basis; lower it, or raise augmentation.cost_eur_per_kwh"
+                )
+
         # The identity documented next to these fields in the scenario file.
         implied = (
             1.0 - self.end_of_life_capacity_fraction
