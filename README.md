@@ -88,6 +88,63 @@ Simplifications inside the modelled scope that a reader should price in:
   AfA figure, so `irr_post_tax` will move once the site and tax life are fixed.
   Both IRRs are reported by name; neither is quoted as plain "IRR".
 
+## Prior art
+
+Surveyed September 2026. Nothing found does exactly what this does, but the
+scope decisions above were made against a known landscape rather than in
+ignorance of one, and the neighbours are worth knowing before extending anything
+here.
+
+**Closest published analogue.** A comparison of Italian and German spot markets
+(ScienceDirect `S2352467726002006`) models a 1 MW BESS across day-ahead energy
+shifting plus FCR, aFRR and mFRR on German market structure, with a Python
+implementation on GitHub archived to Zenodo. Same country, same stack. The
+repository was identified from a search summary and has **not** been opened or
+verified — treat it as a lead, not a citation. Structurally closer still is arXiv
+`2609.03767`: an ageing-aware receding-horizon MILP over a two-day window
+committing one day, evaluating four ageing-cost formulations. It diverges in
+market and in output — Great Britain's NESO Dynamic Containment, Moderation and
+Regulation rather than FCR and aFRR, and lifetime revenue rather than a
+project-level IRR.
+
+**Institutional tools with the same goal.** EPRI's StorageVET and DER-VET are
+open-source Python, stack service values explicitly, and are unusually careful
+about not double-counting one asset's capability across services — the trap that
+`revenue_streams.fcr.reserve_energy_hours` exists to guard. Their service
+definitions are US market constructs, so nothing there covers FCR or aFRR
+prequalification. NREL's SAM is the technoeconomic reference, with degradation
+driving battery replacement scheduling and an IRR over a chosen term: stronger
+than this model on financial mechanics, weaker on ancillary co-optimisation.
+
+**Degradation-aware dispatch.** Bolun Xu's work and code
+(`bolunxu.github.io/codes`) is the antecedent of the `degradation.model` choice,
+and the source of the claim in that field's comment that rainflow counting has no
+analytical expression and cannot be embedded in the optimisation. *Evaluating
+Battery Degradation Models in Rolling-Horizon BESS Arbitrage Optimization*
+(`10.3390/en19041056`) compares Linear-Calendar, Energy-Throughput and
+Cycle-Based rainflow models in this exact setting; `model: throughput` is their
+Energy-Throughput class, so that paper is the direct evidence on what the choice
+costs. NREL's BLAST-Lite (`github.com/NREL/BLAST-Lite`) is the empirical
+lifetime-model library that would replace `calendar_fade_per_year` and
+`cyclic_fade_per_full_cycle` with calibrated figures rather than placeholders.
+
+**Frameworks deliberately not used.** PyPSA and PyPSA-DE, oemof.solph and
+Calliope are the mature open frameworks in European energy modelling, and all
+three can represent a battery. They are system-planning tools. Adopting one to
+value a single asset's revenue stack would be a category error, not a shortcut —
+see the scope discipline in CLAUDE.md.
+
+**Commercial benchmark.** Modo Energy's ME BESS DE benchmark simulates a virtual
+German battery cross-optimised across day-ahead, intraday, FCR and aFRR: this
+model's output, computed on real market data. It is the natural external
+validation target for the synthetic-price limitation recorded above. Not open
+source.
+
+**The gap.** None of the open-source tools carries German regulatory specifics —
+the section 118(6) EnWG grid fee treatment, the AgNes successor regime, FCR
+headroom under Art. 156(9) SO-VO. Those took primary-source verification to get
+right here, and no upstream project will maintain them on this project's behalf.
+
 ## Layout
 
 ```

@@ -28,7 +28,10 @@ degradation:
   # in the objective, so the optimizer trades cycles against spread instead of
   # being clipped at an arbitrary count.
   # rainflow is path-dependent and not MILP-representable; v1 commits to
-  # throughput and keeps the other name only as a forward marker.
+  # throughput and keeps the other name only as a forward marker. That claim is
+  # Xu's, not this project's -- see the degradation-aware dispatch entry under
+  # "Prior art" in the README for the source, and for the comparison of what
+  # choosing throughput over rainflow costs.
   model: throughput                 # throughput | rainflow
   # Charged per MWh discharged. Derivation, because this number sets how hard
   # the optimizer cycles and an undocumented value here is an invisible thumb on
