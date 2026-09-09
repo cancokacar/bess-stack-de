@@ -45,6 +45,11 @@ class DispatchResult:
         return float(np.sum(self.discharge_mw) * self.resolution_hours)
 
     @property
+    def charged_mwh(self) -> float:
+        """Energy drawn from the grid, the basis on which network charges fall."""
+        return float(np.sum(self.charge_mw) * self.resolution_hours)
+
+    @property
     def degradation_cost_eur(self) -> float:
         return self.throughput_mwh * self.degradation_cost_eur_per_mwh
 

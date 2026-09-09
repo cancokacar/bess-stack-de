@@ -53,6 +53,26 @@ Simplifications inside the modelled scope that a reader should price in:
   `grid.post_exemption` fields carry that structure but are zeroed, because the
   agency has published a design and no figures. This is a material IRR driver
   and the single assumption most worth tracking.
+- **Post-exemption grid fees are applied after dispatch, not inside it.**
+  `finance.grid_fees` charges an already-solved year rather than re-solving it
+  under that year's tariff, because re-solving every project year multiplies an
+  81-second run by the project life. The shortcut biases the two halves of the
+  answer in opposite directions. Revenue is *understated*: a dispatch optimised
+  without the fee is still feasible once the fee exists, so it can only score
+  worse than one re-optimised against it, which errs against the project rather
+  than for it. Throughput and cycle count are *overstated*, because the marginal
+  cycles the fee should have suppressed are all still in there. The second is the
+  dangerous one, since the augmentation trigger keys off cycle count and will
+  fire too early on an overstated one.
+  Measured on the synthetic year, against a re-solved run: a 5 EUR/MWh charging
+  fee understates revenue by 1.0 % but overstates throughput by 13.3 %; at
+  15 EUR/MWh it is 13.3 % and 50.9 %; at 25 EUR/MWh, 50.7 % and 101.1 %. Note the
+  asymmetry. At the fee where revenue still looks safe the cycle count is already
+  13 % high, so the metric that reassures you is not the metric that breaks first.
+  The error is exactly zero while the exemption holds, which is the whole of the
+  reference case, so nothing today depends on it. Re-solve per year before
+  anything does.
+
 - **Tax is a single blended rate.** German trade tax varies with the municipal
   Hebesatz, and the depreciation life is a placeholder rather than a confirmed
   AfA figure, so `irr_post_tax` will move once the site and tax life are fixed.
