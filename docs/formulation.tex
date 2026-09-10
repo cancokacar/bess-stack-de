@@ -10,6 +10,13 @@
 \usepackage{fancyhdr}
 \usepackage{hyperref}
 
+% Config and file paths are long unbreakable typewriter strings. \nolinkurl
+% lets them break at '.', '_' and '/' with no hyphen and no hyperlink; \texttt
+% cannot break at all and runs past the margin. Pandoc renders both as code.
+\urlstyle{tt}
+\Urlmuskip=0mu plus 1mu
+\def\UrlBreaks{\do\.\do\_\do\/\do\-\do\:\do\,}
+
 \numberwithin{equation}{section}
 
 \pagestyle{fancy}
@@ -22,8 +29,8 @@
 \renewcommand{\footrulewidth}{0.4pt}
 
 \title{Mathematical Formulation of the Dispatch Optimization Algorithm}
-\author{bess-stack-de \\ Degradation-aware rolling-horizon dispatch for a
-grid-connected BESS in the German market}
+\author{bess-stack-de \\ Degradation-aware rolling-horizon dispatch \\
+for a grid-connected BESS in the German market}
 \date{V1.0}
 
 \begin{document}
@@ -34,7 +41,7 @@ grid-connected BESS in the German market}
 \section{Scope and Conventions}
 
 This document states the optimization model implemented in
-\texttt{./src/bess\_stack/model/dispatch.py}. The project models
+\nolinkurl{src/bess_stack/model/dispatch.py}. The project models
 
 \begin{quote}
 a degradation-aware, rolling-horizon dispatch optimizer for a single
@@ -45,9 +52,9 @@ and feeds a project-level IRR calculation.
 
 \textbf{Section 2 describes what is implemented. Section 3 describes what is
 not.} Every equation in Section 2 corresponds to a statement in
-\texttt{solve\_window}; no equation there describes intended behaviour. Section 3
+\nolinkurl{solve_window}; no equation there describes intended behaviour. Section 3
 formulates the reserve products from the parameters already present in
-\texttt{scenarios/reference.yaml}, none of which the code reads today. The
+\nolinkurl{scenarios/reference.yaml}, none of which the code reads today. The
 distinction is maintained deliberately: a formulation that does not say which
 half is running is not a specification but an advertisement.
 
@@ -65,7 +72,7 @@ model multiplies them by the nominal capacity on load.
 
 \subsection{Index sets}
 
-\begin{tabular}{@{}l p{12cm}@{}}
+\begin{tabular}{@{}l >{\raggedright\arraybackslash}p{12cm}@{}}
 \toprule
 Symbol & Description \\
 \midrule
@@ -80,36 +87,36 @@ $\mathcal{B}_j$     & Steps belonging to day-ahead product block $j$, so that
 
 Each parameter names the field it is read from, so that the document and the
 configuration cannot drift apart unnoticed. Source fields are dotted paths into
-\texttt{scenarios/reference.yaml}; those beginning with a stream name
-(\texttt{day\_ahead}, \texttt{fcr}, \texttt{afrr}) are relative to
-\texttt{revenue\_streams}.
+\nolinkurl{scenarios/reference.yaml}; those beginning with a stream name
+(\nolinkurl{day_ahead}, \texttt{fcr}, \texttt{afrr}) are relative to
+\nolinkurl{revenue_streams}.
 
 \small
-\begin{tabular}{@{}l p{4.6cm} l p{5.4cm}@{}}
+\begin{tabular}{@{}l >{\raggedright\arraybackslash}p{4.4cm} l >{\raggedright\arraybackslash}p{5.6cm}@{}}
 \toprule
 Symbol & Description & Unit & Source field \\
 \midrule
-$\Delta t$   & Length of one time step & h & \texttt{market.resolution\_minutes} \\
+$\Delta t$   & Length of one time step & h & \nolinkurl{market.resolution_minutes} \\
 $\pi_t$      & Day-ahead price in step $t$ & EUR/MWh & price series argument \\
-$\kappa$     & Spread retention, $1 - \text{haircut}$ & -- & \texttt{day\_ahead.spread\_haircut} \\
-$f$          & Trading fee per MWh traded & EUR/MWh & \texttt{day\_ahead.fees\_eur\_per\_mwh} \\
-$g^{c}$      & Network fee on energy charged & EUR/MWh & \texttt{grid.charging\_fees\_eur\_per\_mwh} \\
-$g^{d}$      & Network fee on energy discharged & EUR/MWh & \texttt{grid.discharging\_fees\_eur\_per\_mwh} \\
-$c^{\deg}$   & Marginal degradation cost & EUR/MWh & \texttt{degradation.marginal\_cost\_eur\_per\_mwh} \\
-$\bar{P}$    & Binding power cap & MW & $\min$(\texttt{battery.power\_mw}, \texttt{grid.connection\_limit\_mw}) \\
-$E^{\text{nom}}$ & Nominal usable energy & MWh & \texttt{battery.energy\_mwh} \\
-$\eta^{c}$   & One-way charging efficiency & -- & \texttt{battery.efficiency.charge} \\
-$\eta^{d}$   & One-way discharging efficiency & -- & \texttt{battery.efficiency.discharge} \\
-$\sigma$     & Self-discharge, fraction of $E^{\text{nom}}$ per day & 1/d & \texttt{battery.efficiency.self\_discharge\_per\_day} \\
-$P^{\text{aux}}$ & Parasitic auxiliary load & MW & \texttt{battery.aux\_load\_mw} \\
+$\kappa$     & Spread retention, $1 - \text{haircut}$ & -- & \nolinkurl{day_ahead.spread_haircut} \\
+$f$          & Trading fee per MWh traded & EUR/MWh & \nolinkurl{day_ahead.fees_eur_per_mwh} \\
+$g^{c}$      & Network fee on energy charged & EUR/MWh & \nolinkurl{grid.charging_fees_eur_per_mwh} \\
+$g^{d}$      & Network fee on energy discharged & EUR/MWh & \nolinkurl{grid.discharging_fees_eur_per_mwh} \\
+$c^{\deg}$   & Marginal degradation cost & EUR/MWh & \nolinkurl{degradation.marginal_cost_eur_per_mwh} \\
+$\bar{P}$    & Binding power cap & MW & $\min$(\nolinkurl{battery.power_mw}, \nolinkurl{grid.connection_limit_mw}) \\
+$E^{\text{nom}}$ & Nominal usable energy & MWh & \nolinkurl{battery.energy_mwh} \\
+$\eta^{c}$   & One-way charging efficiency & -- & \nolinkurl{battery.efficiency.charge} \\
+$\eta^{d}$   & One-way discharging efficiency & -- & \nolinkurl{battery.efficiency.discharge} \\
+$\sigma$     & Self-discharge, fraction of $E^{\text{nom}}$ per day & 1/d & \nolinkurl{battery.efficiency.self_discharge_per_day} \\
+$P^{\text{aux}}$ & Parasitic auxiliary load & MW & \nolinkurl{battery.aux_load_mw} \\
 $L$          & Idle energy loss per step, see (2.5) & MWh & derived \\
-$E^{\min}$   & Lower energy bound & MWh & \texttt{battery.soc.min} $\times\, E^{\text{nom}}$ \\
-$E^{\max}$   & Upper energy bound & MWh & \texttt{battery.soc.max} $\times\, E^{\text{nom}}$ \\
+$E^{\min}$   & Lower energy bound & MWh & \nolinkurl{battery.soc.min} $\times\, E^{\text{nom}}$ \\
+$E^{\max}$   & Upper energy bound & MWh & \nolinkurl{battery.soc.max} $\times\, E^{\text{nom}}$ \\
 $E_{\text{init}}$ & Energy at window start & MWh & carried between windows \\
-$E^{\text{term}}$ & Required energy at window end & MWh & \texttt{dispatch.terminal\_soc\_fraction} $\times\, E^{\text{nom}}$ \\
-$m$          & Time steps per day-ahead block & -- & \texttt{day\_ahead.product\_resolution\_minutes} \\
-$H$          & Optimization horizon & h & \texttt{dispatch.horizon\_hours} \\
-$C$          & Committed step of the rolling horizon & h & \texttt{dispatch.commit\_step\_hours} \\
+$E^{\text{term}}$ & Required energy at window end & MWh & \nolinkurl{dispatch.terminal_soc_fraction} $\times\, E^{\text{nom}}$ \\
+$m$          & Time steps per day-ahead block & -- & \nolinkurl{day_ahead.product_resolution_minutes} \\
+$H$          & Optimization horizon & h & \nolinkurl{dispatch.horizon_hours} \\
+$C$          & Committed step of the rolling horizon & h & \nolinkurl{dispatch.commit_step_hours} \\
 \bottomrule
 \end{tabular}
 \normalsize
@@ -117,7 +124,7 @@ $C$          & Committed step of the rolling horizon & h & \texttt{dispatch.comm
 \subsection{Decision variables}
 
 \small
-\begin{tabular}{@{}l l l p{7.5cm}@{}}
+\begin{tabular}{@{}l l l >{\raggedright\arraybackslash}p{7.5cm}@{}}
 \toprule
 Variable & Domain & Unit & Description \\
 \midrule
@@ -160,12 +167,12 @@ of buying. Its terms are:
         \[
           c^{\deg} \le \phi \cdot \kappa^{\text{aug}} \cdot 1000 ,
         \]
-        where $\phi$ is \texttt{degradation.cyclic\_fade\_per\_full\_cycle}
-        and $\kappa^{\text{aug}}$ is
-        \texttt{degradation.augmentation.cost\_eur\_per\_kwh}. Nominal energy
+        where $\phi$ is the cyclic fade per full cycle and
+        $\kappa^{\text{aug}}$ the augmentation cost per kWh, both read from the
+        \nolinkurl{degradation} block. Nominal energy
         cancels out of the ratio, because fade per cycle is a fraction of
         beginning-of-life capacity and one equivalent full cycle discharges
-        exactly that. \texttt{config.py} enforces the bound. There is no
+        exactly that. \nolinkurl{config.py} enforces the bound. There is no
         corresponding lower bound: establishing one needs a discount factor
         keyed to the augmentation date, which depends on the cycle count, which
         is an outcome of dispatch rather than an input to it. Satisfying the
@@ -282,16 +289,16 @@ The horizon exceeds the commitment ($h > c$) so that the uncommitted tail
 absorbs the distortion of B5. A final window shorter than one commitment step
 receives no terminal target, since there is no tail left to absorb it.
 
-Setting \texttt{dispatch.mode} to \texttt{perfect\_foresight} collapses the
+Setting \nolinkurl{dispatch.mode} to \nolinkurl{perfect_foresight} collapses the
 procedure to a single window spanning the entire series. This reports an upper
 bound on achievable revenue rather than an expectation, and the same is true of
-the rolling mode while \texttt{dispatch.forecast.kind} remains \texttt{perfect}:
+the rolling mode while \nolinkurl{dispatch.forecast.kind} remains \texttt{perfect}:
 each window sees its own prices exactly.
 
 \subsection{Post-optimization network charges}
 
 Network charges that fall outside the exemption of \S118(6) EnWG are applied in
-\texttt{./src/bess\_stack/finance/grid\_fees.py} to an already-solved dispatch,
+\nolinkurl{src/bess_stack/finance/grid_fees.py} to an already-solved dispatch,
 rather than by re-solving each project year under that year's tariff. For a year
 $y$ the charge is
 
@@ -320,8 +327,8 @@ wrong. The error is exactly zero while the exemption holds.
 \section{Reserve Products (Specified, Not Implemented)}
 
 \textbf{Nothing in this section is implemented.} The parameters below are
-present in \texttt{scenarios/reference.yaml}, but \texttt{config.py} defines no
-FCR or aFRR dataclass and does not read them, and \texttt{solve\_window} builds
+present in \nolinkurl{scenarios/reference.yaml}, but \nolinkurl{config.py} defines no
+FCR or aFRR dataclass and does not read them, and \nolinkurl{solve_window} builds
 no reserve variables. What follows is the formulation these parameters imply,
 recorded so the schema and the intended model can be checked against each other
 before either is built.
@@ -332,17 +339,17 @@ Let $k \in \mathcal{K}$ index four-hour reserve blocks, with $\mathcal{T}_k$ the
 model steps in block $k$ and $H^{\text{blk}}$ the block length in hours.
 
 \small
-\begin{tabular}{@{}l p{6.2cm} p{6.4cm}@{}}
+\begin{tabular}{@{}l >{\raggedright\arraybackslash}p{6.0cm} >{\raggedright\arraybackslash}p{6.6cm}@{}}
 \toprule
 Symbol & Description & Source field \\
 \midrule
-$c^{\text{FCR}}$      & FCR capacity price (EUR/MW/h) & \texttt{fcr.capacity\_price\_eur\_per\_mw\_h} \\
-$h^{\text{FCR}}$      & Energy headroom held per MW awarded (h) & \texttt{fcr.reserve\_energy\_hours} \\
-$R^{\min}$            & Minimum bid size (MW) & \texttt{fcr.min\_bid\_mw}, \texttt{afrr.min\_bid\_mw} \\
-$c^{a\pm}$            & aFRR capacity price, each direction & \texttt{afrr.\{positive,negative\}.capacity\_price\_eur\_per\_mw\_h} \\
-$\pi^{a\pm}$          & aFRR energy price, each direction & \texttt{afrr.\{positive,negative\}.energy\_price\_eur\_per\_mwh} \\
-$\alpha^{\pm}$        & Expected activation rate & \texttt{afrr.\{positive,negative\}.activation\_rate} \\
-$h^{a}$               & aFRR energy headroom per MW awarded (h) & \texttt{afrr.reserve\_energy\_hours} \\
+$c^{\text{FCR}}$      & FCR capacity price (EUR/MW/h) & \nolinkurl{fcr.capacity_price_eur_per_mw_h} \\
+$h^{\text{FCR}}$      & Energy headroom held per MW awarded (h) & \nolinkurl{fcr.reserve_energy_hours} \\
+$R^{\min}$            & Minimum bid size (MW) & \nolinkurl{fcr.min_bid_mw}, \nolinkurl{afrr.min_bid_mw} \\
+$c^{a\pm}$            & aFRR capacity price, positive direction shown; negative is the counterpart & \nolinkurl{afrr.positive.capacity_price_eur_per_mw_h} \\
+$\pi^{a\pm}$          & aFRR energy price, likewise per direction & \nolinkurl{afrr.positive.energy_price_eur_per_mwh} \\
+$\alpha^{\pm}$        & Expected activation rate, per direction & \nolinkurl{afrr.positive.activation_rate} \\
+$h^{a}$               & aFRR energy headroom per MW awarded (h) & \nolinkurl{afrr.reserve_energy_hours} \\
 \bottomrule
 \end{tabular}
 \normalsize
@@ -418,5 +425,110 @@ dispatch. Closing that gap requires either activation as a deterministic energy
 flow inside B2, or a stochastic formulation over activation scenarios. Until it
 is closed, reserve participation will be overvalued, because the model collects
 activation revenue without paying its state-of-charge consequence.
+
+\section{Execution and Reported Quantities}
+
+\subsection{Running a scenario}
+
+One scenario file in, one revenue summary out:
+
+\begin{verbatim}
+python scripts/run_scenario.py scenarios/reference.yaml           # full year
+python scripts/run_scenario.py scenarios/reference.yaml --days 7  # first 7 days
+\end{verbatim}
+
+\texttt{bess-stack-run} is the same code installed as a console script, and
+appears once the package has been reinstalled, since the installer is what
+generates it.
+
+\subsection{Definition of the reported quantities}
+
+The summary reports six quantities, defined here in terms of the decision
+variables of Section 2.3 so that a number in the output can be traced to the
+model that produced it.
+
+\begin{align}
+\text{gross revenue} &= \sum_{t \in \mathcal{T}} \pi_t \big( P^{d}_{t} - P^{c}_{t} \big) \Delta t \\
+\text{energy discharged} &= \sum_{t \in \mathcal{T}} P^{d}_{t} \Delta t \\
+\text{energy charged} &= \sum_{t \in \mathcal{T}} P^{c}_{t} \Delta t \\
+\text{degradation cost} &= c^{\deg} \sum_{t \in \mathcal{T}} P^{d}_{t} \Delta t \\
+\text{net revenue} &= \text{gross revenue} - \text{degradation cost} \\
+\text{equivalent full cycles} &= \frac{1}{E^{\text{nom}}} \sum_{t \in \mathcal{T}} P^{d}_{t} \Delta t
+\end{align}
+
+Note that (4.1) is evaluated at the raw price $\pi_t$, whereas the objective
+(2.1) is evaluated at the captured price $\pi_t \kappa$ net of fees. The
+reported net revenue is therefore \emph{not} the objective value in general:
+the two differ by
+
+\begin{equation}
+(1 - \kappa) \sum_{t} \pi_t \big( P^{d}_{t} - P^{c}_{t} \big) \Delta t
+\; + \; \big( f + g^{d} \big) \sum_{t} P^{d}_{t} \Delta t
+\; + \; \big( f + g^{c} \big) \sum_{t} P^{c}_{t} \Delta t .
+\end{equation}
+
+In the reference scenario $\kappa = 1$ and $f = g^{c} = g^{d} = 0$, so the
+difference vanishes and the two coincide. That is a property of the reference
+case rather than an identity, and it stops holding the moment a haircut or a fee
+is set.
+
+Energy discharged is the quantity degradation is charged on, and equivalent full
+cycles is that same energy expressed in units of nominal capacity. The two carry
+the same information and are reported together only because the cycle count is
+the figure that feeds the augmentation trigger.
+
+\subsection{Reference case}
+
+Measured on the reference scenario over a full synthetic year, not illustrative:
+
+\begin{tabular}{@{}lr@{}}
+\toprule
+Quantity & Value \\
+\midrule
+Gross revenue           & 473{,}374 EUR \\
+Degradation cost        & 46{,}104 EUR \\
+Net revenue             & 427{,}270 EUR \\
+Energy discharged       & 11{,}526 MWh \\
+Energy charged          & 13{,}565 MWh \\
+Equivalent full cycles  & 576.3 \\
+\bottomrule
+\end{tabular}
+
+The gap between energy charged and energy discharged is round-trip loss plus the
+idle loss $L$ of (2.5), and is the physical content of the efficiency asymmetry
+described under constraint group B2.
+
+\subsection{What the reported figures exclude}
+
+The summary carries four caveats. They are not decoration on the output; they
+are the difference between what the scenario describes and what the model
+computes, and each is a restatement in operational terms of a boundary already
+drawn in this document.
+
+\begin{itemize}
+  \item \textbf{Day-ahead only.} \nolinkurl{revenue_streams.fcr} and
+        \nolinkurl{revenue_streams.afrr} are enabled in the reference scenario,
+        but Section 3 is not implemented, so every figure is the day-ahead leg
+        alone and understates the stack the scenario describes.
+  \item \textbf{No return metrics.} Nothing in \nolinkurl{finance/} computes the
+        quantities \nolinkurl{outputs.metrics} names, so the summary stops at
+        annual net revenue. That number is not a return: it is gross margin
+        before capital cost, tax and financing.
+  \item \textbf{Synthetic prices.} \nolinkurl{market.price_source} is
+        \texttt{synthetic}, and the alternatives raise rather than silently
+        degrade. The figures measure the price generator of
+        \nolinkurl{data/prices.py}, not the German market.
+  \item \textbf{Short runs are not annualised.} \texttt{-{}-days N} models the
+        first $N$ days of the series, which begin in January. January carries
+        the narrowest spreads in the synthetic year, so pro-rating a short run
+        understates the year rather than approximating it. Seven days yield
+        5{,}940 EUR net, which pro-rates to roughly 310{,}000 EUR against the
+        427{,}270 EUR measured above --- an understatement of about 27\%.
+\end{itemize}
+
+Network charges are reported separately and are zero in every year of the
+reference case, for the reason given in Section 2.7: the exemption of
+\S118(6) EnWG runs to 2044 and the modelled life is 2025--2044, so no project
+year is charged.
 
 \end{document}

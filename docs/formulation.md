@@ -6,7 +6,7 @@
 # Scope and Conventions
 
 This document states the optimization model implemented in
-`./src/bess_stack/model/dispatch.py`. The project models
+`src/bess_stack/model/dispatch.py`. The project models
 
 > a degradation-aware, rolling-horizon dispatch optimizer for a single
 > grid-connected BESS in the German market, co-optimizing day-ahead
@@ -113,17 +113,16 @@ the cost of buying. Its terms are:
   ``` math
   c^{\deg} \le \phi \cdot \kappa^{\text{aug}} \cdot 1000 ,
   ```
-  where $`\phi`$ is `degradation.cyclic_fade_per_full_cycle` and
-  $`\kappa^{\text{aug}}`$ is
-  `degradation.augmentation.cost_eur_per_kwh`. Nominal energy cancels
-  out of the ratio, because fade per cycle is a fraction of
-  beginning-of-life capacity and one equivalent full cycle discharges
-  exactly that. `config.py` enforces the bound. There is no
-  corresponding lower bound: establishing one needs a discount factor
-  keyed to the augmentation date, which depends on the cycle count,
-  which is an outcome of dispatch rather than an input to it. Satisfying
-  the bound therefore shows the value is not indefensibly high, not that
-  it is right.
+  where $`\phi`$ is the cyclic fade per full cycle and
+  $`\kappa^{\text{aug}}`$ the augmentation cost per kWh, both read from
+  the `degradation` block. Nominal energy cancels out of the ratio,
+  because fade per cycle is a fraction of beginning-of-life capacity and
+  one equivalent full cycle discharges exactly that. `config.py`
+  enforces the bound. There is no corresponding lower bound:
+  establishing one needs a discount factor keyed to the augmentation
+  date, which depends on the cycle count, which is an outcome of
+  dispatch rather than an input to it. Satisfying the bound therefore
+  shows the value is not indefensibly high, not that it is right.
 
 - $`\Delta t`$ — converts power in MW to energy in MWh over the step.
 
@@ -256,7 +255,7 @@ true of the rolling mode while `dispatch.forecast.kind` remains
 ## Post-optimization network charges
 
 Network charges that fall outside the exemption of §118(6) EnWG are
-applied in `./src/bess_stack/finance/grid_fees.py` to an already-solved
+applied in `src/bess_stack/finance/grid_fees.py` to an already-solved
 dispatch, rather than by re-solving each project year under that year’s
 tariff. For a year $`y`$ the charge is
 
@@ -304,9 +303,9 @@ the block length in hours.
 | $`c^{\text{FCR}}`$ | FCR capacity price (EUR/MW/h) | `fcr.capacity_price_eur_per_mw_h` |
 | $`h^{\text{FCR}}`$ | Energy headroom held per MW awarded (h) | `fcr.reserve_energy_hours` |
 | $`R^{\min}`$ | Minimum bid size (MW) | `fcr.min_bid_mw`, `afrr.min_bid_mw` |
-| $`c^{a\pm}`$ | aFRR capacity price, each direction | `afrr.{positive,negative}.capacity_price_eur_per_mw_h` |
-| $`\pi^{a\pm}`$ | aFRR energy price, each direction | `afrr.{positive,negative}.energy_price_eur_per_mwh` |
-| $`\alpha^{\pm}`$ | Expected activation rate | `afrr.{positive,negative}.activation_rate` |
+| $`c^{a\pm}`$ | aFRR capacity price, positive direction shown; negative is the counterpart | `afrr.positive.capacity_price_eur_per_mw_h` |
+| $`\pi^{a\pm}`$ | aFRR energy price, likewise per direction | `afrr.positive.energy_price_eur_per_mwh` |
+| $`\alpha^{\pm}`$ | Expected activation rate, per direction | `afrr.positive.activation_rate` |
 | $`h^{a}`$ | aFRR energy headroom per MW awarded (h) | `afrr.reserve_energy_hours` |
 
 ## Additional variables
@@ -388,3 +387,106 @@ either activation as a deterministic energy flow inside B2, or a
 stochastic formulation over activation scenarios. Until it is closed,
 reserve participation will be overvalued, because the model collects
 activation revenue without paying its state-of-charge consequence.
+
+# Execution and Reported Quantities
+
+## Running a scenario
+
+One scenario file in, one revenue summary out:
+
+    python scripts/run_scenario.py scenarios/reference.yaml           # full year
+    python scripts/run_scenario.py scenarios/reference.yaml --days 7  # first 7 days
+
+`bess-stack-run` is the same code installed as a console script, and
+appears once the package has been reinstalled, since the installer is
+what generates it.
+
+## Definition of the reported quantities
+
+The summary reports six quantities, defined here in terms of the
+decision variables of Section 2.3 so that a number in the output can be
+traced to the model that produced it.
+
+``` math
+\begin{aligned}
+\text{gross revenue} &= \sum_{t \in \mathcal{T}} \pi_t \big( P^{d}_{t} - P^{c}_{t} \big) \Delta t \\
+\text{energy discharged} &= \sum_{t \in \mathcal{T}} P^{d}_{t} \Delta t \\
+\text{energy charged} &= \sum_{t \in \mathcal{T}} P^{c}_{t} \Delta t \\
+\text{degradation cost} &= c^{\deg} \sum_{t \in \mathcal{T}} P^{d}_{t} \Delta t \\
+\text{net revenue} &= \text{gross revenue} - \text{degradation cost} \\
+\text{equivalent full cycles} &= \frac{1}{E^{\text{nom}}} \sum_{t \in \mathcal{T}} P^{d}_{t} \Delta t
+\end{aligned}
+```
+
+Note that (4.1) is evaluated at the raw price $`\pi_t`$, whereas the
+objective (2.1) is evaluated at the captured price $`\pi_t \kappa`$ net
+of fees. The reported net revenue is therefore *not* the objective value
+in general: the two differ by
+
+``` math
+(1 - \kappa) \sum_{t} \pi_t \big( P^{d}_{t} - P^{c}_{t} \big) \Delta t
+\; + \; \big( f + g^{d} \big) \sum_{t} P^{d}_{t} \Delta t
+\; + \; \big( f + g^{c} \big) \sum_{t} P^{c}_{t} \Delta t .
+```
+
+In the reference scenario $`\kappa = 1`$ and $`f = g^{c} = g^{d} = 0`$,
+so the difference vanishes and the two coincide. That is a property of
+the reference case rather than an identity, and it stops holding the
+moment a haircut or a fee is set.
+
+Energy discharged is the quantity degradation is charged on, and
+equivalent full cycles is that same energy expressed in units of nominal
+capacity. The two carry the same information and are reported together
+only because the cycle count is the figure that feeds the augmentation
+trigger.
+
+## Reference case
+
+Measured on the reference scenario over a full synthetic year, not
+illustrative:
+
+| Quantity               |       Value |
+|:-----------------------|------------:|
+| Gross revenue          | 473,374 EUR |
+| Degradation cost       |  46,104 EUR |
+| Net revenue            | 427,270 EUR |
+| Energy discharged      |  11,526 MWh |
+| Energy charged         |  13,565 MWh |
+| Equivalent full cycles |       576.3 |
+
+The gap between energy charged and energy discharged is round-trip loss
+plus the idle loss $`L`$ of (2.5), and is the physical content of the
+efficiency asymmetry described under constraint group B2.
+
+## What the reported figures exclude
+
+The summary carries four caveats. They are not decoration on the output;
+they are the difference between what the scenario describes and what the
+model computes, and each is a restatement in operational terms of a
+boundary already drawn in this document.
+
+- **Day-ahead only.** `revenue_streams.fcr` and `revenue_streams.afrr`
+  are enabled in the reference scenario, but Section 3 is not
+  implemented, so every figure is the day-ahead leg alone and
+  understates the stack the scenario describes.
+
+- **No return metrics.** Nothing in `finance/` computes the quantities
+  `outputs.metrics` names, so the summary stops at annual net revenue.
+  That number is not a return: it is gross margin before capital cost,
+  tax and financing.
+
+- **Synthetic prices.** `market.price_source` is `synthetic`, and the
+  alternatives raise rather than silently degrade. The figures measure
+  the price generator of `data/prices.py`, not the German market.
+
+- **Short runs are not annualised.** `--days N` models the first $`N`$
+  days of the series, which begin in January. January carries the
+  narrowest spreads in the synthetic year, so pro-rating a short run
+  understates the year rather than approximating it. Seven days yield
+  5,940 EUR net, which pro-rates to roughly 310,000 EUR against the
+  427,270 EUR measured above — an understatement of about 27%.
+
+Network charges are reported separately and are zero in every year of
+the reference case, for the reason given in Section 2.7: the exemption
+of §118(6) EnWG runs to 2044 and the modelled life is 2025–2044, so no
+project year is charged.

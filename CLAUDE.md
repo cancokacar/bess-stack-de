@@ -12,6 +12,8 @@ pip install -e ".[dev]"            # first setup; .venv/ already has this
 .venv/bin/ruff check src tests     # lint; not part of the pytest run
 { printf '<!-- GENERATED FILE. Source: docs/formulation.tex -- edit that, not this.\n     Regenerate with the pandoc command in CLAUDE.md.\n     Equation numbers do not survive the conversion; the numbers used in the prose\n     ((2.1), (2.4), ...) match the compiled PDF, not anything numbered below. -->\n\n'; \
   pandoc -f latex -t gfm --mathjax docs/formulation.tex; } > docs/formulation.md
+cd docs && latexmk -pdf -interaction=nonstopmode -halt-on-error formulation.tex
+grep -ac 'Overfull \\hbox' docs/formulation.log   # expect 1: a 2.6pt line, see below
 .venv/bin/python scripts/measure_grid_fee_error.py --check   # ~6 min, not in pytest
 .venv/bin/python scripts/run_scenario.py scenarios/reference.yaml            # ~81 s
 .venv/bin/python scripts/run_scenario.py scenarios/reference.yaml --days 7   # ~2 s
@@ -108,8 +110,21 @@ the same commit. The document's parameter table names the scenario field behind
 every symbol, so a renamed config field makes the table wrong. Section 2 is
 implemented and section 3 is not; that boundary moves only when code moves.
 Never hand-edit `docs/formulation.md` — it is generated, and the regeneration
-command above will discard the edit. No TeX engine is installed here, so the
-`.tex` cannot be compiled or visually checked locally; that is the user's step.
+command above will discard the edit. `docs/formulation.pdf` is tracked, so a
+change to the `.tex` means rebuilding both the PDF and the Markdown in the same
+commit, or the repository ships a document that disagrees with itself.
+
+**Paths in the formulation use `\nolinkurl`, not `\texttt`.** A config path is a
+long typewriter string with no breakpoints TeX will take, and `\texttt` cannot
+break one: the first build ran fifteen lines past the margin, the worst by 4.5 cm.
+`\nolinkurl` breaks at `.`, `_` and `/` with no hyphen and no hyperlink, and
+pandoc renders it as a code span exactly as `\texttt`, so the Markdown is
+unaffected. Keep path arguments free of braces. One 2.6 pt overfull line remains
+and is deliberate — under a millimetre, not worth contorting prose for.
+
+Checking the build log needs `grep -a`: this system's `grep` is ugrep, which
+treats `formulation.log` as binary and silently reports nothing without it. A
+clean-looking check with no `-a` is a false negative, not a clean build.
 
 **Commit messages carry the reasoning**, not just the change: what was ambiguous
 or wrong, why the chosen fix beats the alternative, and which numbers are
