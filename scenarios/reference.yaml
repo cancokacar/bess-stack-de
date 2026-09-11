@@ -40,7 +40,7 @@ degradation:
   #   Upper bound, undiscounted, ENFORCED at load:
   #     cyclic_fade_per_full_cycle * augmentation.cost_eur_per_kwh * 1000
   #     == 0.00005 * 120 * 1000 == 6.00 EUR/MWh
-  #   Battery energy cancels out -- fade per cycle is a fraction of BOL, and one
+  #   Battery energy cancels out -- fade per cycle is a fraction of BOL (beginning of life), and one
   #   equivalent full cycle discharges BOL -- so the bound needs no battery size.
   #
   # That bound overstates the cost, because the augmentation spend falls at the
@@ -58,7 +58,7 @@ degradation:
   # checked: the lower end needs a discount factor keyed to the augmentation
   # date, which depends on the cycle count, which is an outcome of dispatch.
   marginal_cost_eur_per_mwh: 4.0
-  calendar_fade_per_year: 0.015     # fraction of BOL capacity, idle
+  calendar_fade_per_year: 0.015     # fraction of BOL (beginning of life) capacity, idle
   cyclic_fade_per_full_cycle: 0.00005
   end_of_life_capacity_fraction: 0.70
   # Identity that must hold whenever the three fields above are edited:
