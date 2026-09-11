@@ -126,6 +126,28 @@ Checking the build log needs `grep -a`: this system's `grep` is ugrep, which
 treats `formulation.log` as binary and silently reports nothing without it. A
 clean-looking check with no `-a` is a false negative, not a clean build.
 
+**Market data is pulled, not committed.** `.gitignore` already blocks
+`*.parquet`, `*.csv`, `data/raw/` and `data/interim/`, so bulk SMARD,
+regelleistung.net or netztransparenz series cannot land by accident. The trap is
+the carve-out: shipping a fixture needs a negation rule, and a broad one
+(`!tests/data/*.csv`) silently re-opens the path for everything else. Name the
+files. This is the same decision `.gitignore` already annotates for
+`docs/formulation.pdf` — tracked deliberately at 405 kB because a reader needs
+it, and that is also the scale this rule is drawn at: a clone stays seconds, not
+minutes. Redistribution terms differ per source and none has been read here.
+Read the one you are about to use before committing anything that came from it,
+and record what it says in the README beside "Reserve market price provenance is
+unresolved" rather than summarising it here as settled.
+
+**Price fixtures must carry the pathological cases.** `data/prices.py` hardcodes
+`HOURS_PER_YEAR = 8760` and builds the series with `np.arange`, which is true of
+the synthetic generator and false of DE-LU: March has a 23-hour day, October a
+25-hour day with a duplicated local hour, and SMARD exports carry missing and
+revised values. A fixture cut as the first N rows is a clean January window, so a
+passing loader test proves the parser runs and nothing about whether it is right.
+Choose fixture windows to contain those cases, and say in the filename or a
+comment which one each carries.
+
 **Commit messages carry the reasoning**, not just the change: what was ambiguous
 or wrong, why the chosen fix beats the alternative, and which numbers are
 placeholders. See `git log` for the established shape.
