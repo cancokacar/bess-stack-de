@@ -1,0 +1,179 @@
+# scenarios/reference.yaml with the price series swapped for the real thing.
+#
+# Every value below is copied from reference.yaml unchanged except four: name,
+# description, market.year and market.price_source. That is deliberate and it is
+# the whole point of the file — if anything else differs, a comparison between
+# the two runs stops being a statement about prices and becomes a statement
+# about two unrelated scenarios.
+#
+# THE REASONING FOR EACH NUMBER LIVES IN reference.yaml AND IS NOT REPEATED HERE.
+# The derivations there are long and carefully sourced, and copying them would
+# create a second place for them to go stale. Read that file for why any
+# particular figure has the value it does. What this file records instead is
+# what the price swap invalidates.
+#
+# ALL NON-PRICE VALUES REMAIN PLACEHOLDERS. Real prices do not make the capex,
+# the opex, the tax rate or the degradation coefficients real. Nothing here has
+# been calibrated against a vendor quote or a tax table, so the returns this
+# scenario produces are a real price series run through an assumed project.
+
+name: de-lu-2024
+description: >-
+  Reference case dispatched against actual DE-LU day-ahead prices for 2024,
+  published by SMARD (Bundesnetzagentur, CC BY 4.0). Identical to the reference
+  scenario in every respect except the price series, so the difference between
+  the two runs isolates the effect of the synthetic generator.
+
+battery:
+  power_mw: 10.0
+  energy_mwh: 20.0
+  efficiency:
+    charge: 0.938
+    discharge: 0.938
+    self_discharge_per_day: 0.001
+  soc:
+    min: 0.05
+    max: 0.95
+    initial: 0.50
+  aux_load_mw: 0.05
+
+degradation:
+  model: throughput
+  # UNCALIBRATED FOR THIS SCENARIO, and the one number in this file that the
+  # price swap actively breaks.
+  #
+  # reference.yaml derives 4.0 from a band whose lower end is keyed to a
+  # MEASURED 577 equivalent full cycles per year -- measured on the synthetic
+  # series. Real prices cycle the battery differently, so that measurement is
+  # not evidence for this value here. The undiscounted upper bound of
+  # 6.00 EUR/MWh still holds, because it depends only on
+  # cyclic_fade_per_full_cycle and augmentation.cost_eur_per_kwh, and config.py
+  # still enforces it.
+  #
+  # Kept at 4.0 regardless, so this run differs from the reference in the price
+  # series alone. Re-deriving it against this scenario's own cycle count is
+  # follow-up work; until then, treat the degradation cost as an input carried
+  # over rather than a figure this scenario has justified.
+  marginal_cost_eur_per_mwh: 4.0
+  calendar_fade_per_year: 0.015
+  cyclic_fade_per_full_cycle: 0.00005
+  end_of_life_capacity_fraction: 0.70
+  equivalent_full_cycles_to_eol: 6000
+  augmentation:
+    enabled: true
+    trigger_capacity_fraction: 0.80
+    restore_to_capacity_fraction: 1.00
+    max_events: 2
+    cost_eur_per_kwh: 120.0
+
+market:
+  country: DE
+  bidding_zone: DE-LU
+  # 2024 because the SMARD cache under data/raw/smard/ covers it completely, so
+  # this scenario runs offline. It is also a leap year: 366 * 96 == 35,136
+  # quarter-hourly steps against the synthetic year's 35,040. Both daylight
+  # saving transitions fall inside it, which is what the fixtures in
+  # tests/data/smard/ exist to prove the loader survives.
+  year: 2024
+  timezone: Europe/Berlin
+  resolution_minutes: 15
+  # The reason this file exists. data/smard.py serves DE-LU day-ahead at
+  # quarter-hourly resolution only, so resolution_minutes above is not free to
+  # change here the way it is in reference.yaml.
+  price_source: smard
+
+dispatch:
+  mode: rolling_horizon
+  horizon_hours: 36
+  commit_step_hours: 4
+  terminal_soc_fraction: 0.50
+  forecast:
+    kind: perfect
+    price_error_sigma_eur_per_mwh: 12.0
+    seed: 42
+  solver:
+    name: highs
+    mip_gap: 0.005
+    time_limit_s: 60
+
+revenue_streams:
+  day_ahead:
+    enabled: true
+    product_resolution_minutes: 60
+    spread_haircut: 0.0
+    fees_eur_per_mwh: 0.0
+
+  # Still invented placeholders, and now conspicuously so: the day-ahead leg of
+  # this scenario is real and these are not. regelleistung.net publishes the
+  # clearing prices that would replace them but under an all-rights-reserved
+  # notice, so they cannot be committed here -- see "Data provenance" in the
+  # README. model.dispatch does not read either stream in any case.
+  fcr:
+    enabled: true
+    symmetric: true
+    block_hours: 4
+    min_bid_mw: 1.0
+    reserve_energy_hours: 0.25
+    capacity_price_eur_per_mw_h: 12.0
+
+  afrr:
+    enabled: true
+    block_hours: 4
+    min_bid_mw: 1.0
+    reserve_energy_hours: 1.0
+    positive:
+      capacity_price_eur_per_mw_h: 8.0
+      energy_price_eur_per_mwh: 85.0
+      activation_rate: 0.08
+    negative:
+      capacity_price_eur_per_mw_h: 5.0
+      energy_price_eur_per_mwh: -15.0
+      activation_rate: 0.10
+
+grid:
+  connection_limit_mw: 10.0
+  # Left at 2044 to match reference.yaml, which means this scenario also never
+  # exercises a charged year. Lowering it is how the section 118(6) EnWG cliff
+  # gets stressed, and doing that against real prices rather than synthetic ones
+  # is the reason this file was worth adding.
+  grid_fee_exemption_until_year: 2044
+  post_exemption:
+    capacity_charge_eur_per_kw_year: 0.0
+    charging_fees_eur_per_mwh: 0.0
+  charging_fees_eur_per_mwh: 0.0
+  discharging_fees_eur_per_mwh: 0.0
+
+finance:
+  basis: real
+  inflation_per_year: 0.02
+  capex_eur_per_kwh: 250.0
+  capex_fixed_eur: 0.0
+  opex_eur_per_kw_year: 8.0
+  opex_real_escalation_per_year: 0.0
+  discount_rate: 0.07
+  # 20 years from a 2025 commissioning in reference.yaml. Kept at 20 here even
+  # though the price year is 2024: the modelled year is the dispatch sample, not
+  # the commissioning date, and the cashflow repeats it across the life.
+  project_lifetime_years: 20
+  residual_value_fraction: 0.0
+  tax_rate: 0.30
+  depreciation:
+    method: straight_line
+    years: 20
+    capitalise_augmentation: true
+  loss_carryforward: true
+  debt:
+    enabled: false
+    share_of_capex: 0.60
+    interest_rate: 0.05
+    tenor_years: 10
+
+outputs:
+  revenue_stack_by_stream: true
+  annual_cashflow: true
+  metrics:
+    - npv_post_tax
+    - irr_pre_tax
+    - irr_post_tax
+    - payback_years
+    - lcos_eur_per_mwh

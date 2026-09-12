@@ -282,12 +282,68 @@ than decoration on it:
   pack past end of life. The summary says so; the metrics do not correct for it.
 - **Synthetic prices by default.** `market.price_source` is `synthetic`, so the
   headline figures measure the price generator rather than the German market.
-  `smard` fetches real DE-LU prices; `entsoe` still raises.
+  `smard` fetches real DE-LU prices; `entsoe` still raises. What that substitution
+  is worth is measured below, and it is not small.
 - **Short runs are not annualised.** `--days N` models the first N days, which start
   in January — the narrowest spreads in the synthetic series — so pro-rating a short
   run understates the year. A week pro-rates to about 310,000 EUR against the
   427,270 measured above.
 
-Scenarios live in `scenarios/`; `reference.yaml` is the baseline case. A bad path, a
-malformed file or an inconsistent scenario exits 1 with one line on stderr; an
-out-of-range `--days` exits 2.
+Scenarios live in `scenarios/`; `reference.yaml` is the baseline case and
+`de-lu-2024.yaml` is the same case on real prices. A bad path, a malformed file or
+an inconsistent scenario exits 1 with one line on stderr; an out-of-range `--days`
+exits 2.
+
+### What real prices change
+
+`scenarios/de-lu-2024.yaml` is `reference.yaml` with the price series swapped for
+published DE-LU day-ahead prices for 2024 (SMARD, CC BY 4.0). Exactly four fields
+differ — `name`, `description`, `market.year`, `market.price_source` — and a test
+asserts that, because the comparison means nothing unless everything else is
+identical.
+
+```bash
+.venv/bin/python scripts/run_scenario.py scenarios/de-lu-2024.yaml   # ~100 s
+```
+
+Both full years, measured rather than illustrative:
+
+|                          | synthetic 2025   | DE-LU 2024      |
+| ------------------------ | ---------------- | --------------- |
+| gross revenue            | 473,374 EUR      | 690,696 EUR     |
+| degradation cost         | 46,104 EUR       | 40,759 EUR      |
+| net revenue              | 427,270 EUR      | 649,938 EUR     |
+| energy discharged        | 11,526 MWh       | 10,190 MWh      |
+| energy charged           | 13,565 MWh       | 12,048 MWh      |
+| equivalent full cycles   | 576.3            | 509.5           |
+| `npv_post_tax`           | -2,334,934 EUR   | -807,456 EUR    |
+| `irr_pre_tax`            | 0.51 %           | 6.98 %          |
+| `irr_post_tax`           | -0.07 %          | 4.79 %          |
+| `payback_years`          | never            | 12.7 y          |
+| `lcos_eur_per_mwh`       | 61.16            | 67.88           |
+
+**The synthetic generator understates the market, and not by a little.** Real 2024
+prices earn 52 % more net revenue on 12 % *fewer* cycles — 741 EUR per equivalent
+full cycle becomes 1,276. The generator's spreads are too narrow, so it buys
+throughput cheaply and sells it cheaply. Every figure this project reported before
+this scenario existed was wrong in that direction, which matters for how the
+synthetic run should be read: it is pessimistic about revenue and optimistic about
+throughput *at the same time*, so it is not a conservative case, it is a differently
+shaped one.
+
+**Real prices still do not clear the hurdle.** `irr_post_tax` of 4.79 % sits below
+the 7 % post-tax WACC in `finance.discount_rate`, so `npv_post_tax` stays negative.
+Day-ahead arbitrage alone does not pay for this battery at a placeholder
+250 EUR/kWh. That is the quantitative case for the reserve streams the scope
+sentence promises and `model.dispatch` does not implement — and it is the first
+figure here that is a statement about Germany rather than about a price generator.
+
+LCOS moves the other way, 61.16 to 67.88 EUR/MWh, because fewer cycles spread the
+same fixed cost over less throughput: a better project carrying a worse unit cost.
+
+Every non-price value in `de-lu-2024.yaml` is still the placeholder it is in
+`reference.yaml`, so this is a real price series run through an assumed project.
+`degradation.marginal_cost_eur_per_mwh` deserves particular suspicion: its
+derivation in `reference.yaml` is keyed to a cycle count measured on the synthetic
+series, and this run's cycle count is 12 % lower, so the number is carried over
+rather than justified here.

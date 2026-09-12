@@ -131,3 +131,47 @@ def test_smard_refuses_a_resolution_it_does_not_serve():
     scenario = _scenario(price_source="smard", resolution_minutes=60)
     with pytest.raises(smard.SmardError, match="quarter-hourly"):
         smard.day_ahead_prices(scenario)
+
+
+def _flatten(d: dict, prefix: str = "") -> dict:
+    out: dict = {}
+    for key, value in d.items():
+        path = f"{prefix}.{key}" if prefix else key
+        if isinstance(value, dict):
+            out.update(_flatten(value, path))
+        else:
+            out[path] = value
+    return out
+
+
+def test_real_price_scenario_asks_for_smard_at_the_resolution_it_serves():
+    """Config only, deliberately.
+
+    Dispatching de-lu-2024.yaml needs 54 cached weeks or 54 fetches, neither of
+    which belongs in a test suite that has to run offline.
+    """
+    with open("scenarios/de-lu-2024.yaml") as fh:
+        scenario = Scenario.from_dict(yaml.safe_load(fh))
+    assert scenario.market.price_source == "smard"
+    assert scenario.market.resolution_minutes == 15
+    assert scenario.market.year == 2024
+    # 2024 is a leap year and both DST transitions fall inside it; they cancel.
+    assert smard.expected_steps(2024) == 366 * 96
+
+
+def test_real_price_scenario_differs_from_the_reference_only_in_the_price_series():
+    """The reason the two runs can be compared at all.
+
+    de-lu-2024.yaml exists to isolate the effect of swapping the synthetic
+    generator for published prices. That only holds while every other field is
+    identical, and two scenario files maintained by hand drift. This test is
+    what keeps the claim in that file's header true.
+    """
+    with open("scenarios/reference.yaml") as fh:
+        reference = _flatten(yaml.safe_load(fh))
+    with open("scenarios/de-lu-2024.yaml") as fh:
+        real = _flatten(yaml.safe_load(fh))
+
+    assert set(reference) == set(real), "the two scenarios no longer describe the same fields"
+    differing = {k for k in reference if reference[k] != real[k]}
+    assert differing == {"name", "description", "market.year", "market.price_source"}
