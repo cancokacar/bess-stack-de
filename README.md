@@ -1,5 +1,7 @@
 # bess-stack-de
 
+[![CI](https://github.com/Canny95/bess-stack-de/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Canny95/bess-stack-de/actions/workflows/ci.yml)
+
 Revenue-stacking model for battery energy storage systems (BESS) in Germany.
 
 A degradation-aware, rolling-horizon dispatch optimizer for a single grid-connected BESS in the German market, co-optimizing day-ahead arbitrage, FCR capacity, and aFRR capacity + energy, that outputs an annual revenue stack and feeds a project-level IRR calculation.
