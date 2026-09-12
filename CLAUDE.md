@@ -17,6 +17,8 @@ grep -ac 'Overfull \\hbox' docs/formulation.log   # expect 1: a 2.6pt line, see 
 .venv/bin/python scripts/measure_grid_fee_error.py --check   # ~6 min, not in pytest
 .venv/bin/python scripts/run_scenario.py scenarios/reference.yaml            # ~81 s
 .venv/bin/python scripts/run_scenario.py scenarios/reference.yaml --days 7   # ~2 s
+gh run list --limit 5              # recent CI results
+gh workflow run CI                 # run the ~6 min grid fee drift job on demand
 ```
 
 The `scripts/` form is the primary one: `bess-stack-run`, the `[project.scripts]`
@@ -25,6 +27,34 @@ appears after `pip install -e ".[dev]"` is re-run.
 
 Running a full synthetic year of dispatch takes ~81 s and 35,040 steps. Tests
 use 1–4 day windows to stay fast; do the same for anything iterative.
+
+## CI
+
+[.github/workflows/ci.yml](.github/workflows/ci.yml) runs on every push to `main`
+and every pull request. Three jobs:
+
+- **`test`** — `ruff check src tests`, then `pytest -q`, on Python 3.11 and 3.13.
+  3.11 is the floor `pyproject.toml` declares and 3.13 is what this is developed
+  against, so a failure on 3.11 alone means `requires-python` is lying rather
+  than that a test is wrong.
+- **`docs`** — regenerates `docs/formulation.md` from the `.tex` and diffs it,
+  and fails a pull request that changes `formulation.tex` without also changing
+  the tracked `formulation.pdf`.
+- **`grid-fee-drift`** — `measure_grid_fee_error.py --check`, weekly and on
+  demand rather than per pull request. It takes about six minutes and can only
+  move when dispatch or the fee model changes, and a six-minute wait on a typo
+  fix is how a check gets switched off.
+
+Two things to know before relying on it.
+
+**The `.tex`/`.pdf` pairing check runs on `pull_request` only**, because it needs
+a base commit to diff against. A commit pushed straight to `main` bypasses it, so
+the convention below is still the real guarantee and CI is only the backstop.
+
+**Pandoc is pinned to 3.6.2.** gfm output is not stable across pandoc majors, so
+regenerating `formulation.md` with a different pandoc produces a file CI rejects
+even when nothing about the document changed. Match the version, or expect the
+`docs` job to disagree with you.
 
 ## Scope discipline
 
@@ -49,11 +79,15 @@ notably the cycles-to-end-of-life identity, which ties
 `equivalent_full_cycles_to_eol` together. Editing one of those three numbers
 without the others fails at load.
 
-**Unimplemented options raise rather than silently degrade.** The scenario schema
-advertises `degradation.model: rainflow`, `dispatch.forecast.kind` other than
-`perfect`, and `market.price_source: entsoe | smard`. None exist. Each raises a
-clear error naming why. Keep that pattern when adding options ahead of
-implementations.
+**Unimplemented options raise rather than silently degrade.** Each raises a clear
+error naming why, rather than falling back to a default. Still unimplemented:
+`degradation.model: rainflow`, `dispatch.forecast.kind` other than `perfect`,
+`market.price_source: entsoe`, `finance.depreciation.method` other than
+`straight_line`, and `finance.basis: nominal`. Keep that pattern when adding an
+option ahead of its implementation — and note that this list goes stale as things
+get built. `market.price_source: smard` sat on it until `data/prices.py` began
+dispatching to `data/smard.py`; whatever is built next should leave here in the
+same commit.
 
 **The MILP binary is load-bearing.** `solve_window` uses one binary per step to
 forbid simultaneous charge and discharge. Do not relax this to an LP: at
@@ -117,7 +151,9 @@ error is measured against a re-solved run and recorded in the README with
 numbers, including the direction of each bias — revenue understated, throughput
 and cycle count overstated. When you take a shortcut like this, measure it the
 same way, on a full year rather than a sample month (January has the narrowest
-spreads in the synthetic series, so extrapolating it distorts the result).
+spreads in the synthetic series, so extrapolating it distorts the result). CI's
+`grid-fee-drift` job re-measures the recorded figures weekly, so a drift surfaces
+without anyone remembering to look for one.
 
 **The formulation document is part of the model's definition.** `solve_window`
 and [docs/formulation.tex](docs/formulation.tex) state the same MILP in two
@@ -128,7 +164,9 @@ implemented and section 3 is not; that boundary moves only when code moves.
 Never hand-edit `docs/formulation.md` — it is generated, and the regeneration
 command above will discard the edit. `docs/formulation.pdf` is tracked, so a
 change to the `.tex` means rebuilding both the PDF and the Markdown in the same
-commit, or the repository ships a document that disagrees with itself.
+commit, or the repository ships a document that disagrees with itself. CI's
+`docs` job checks both halves, but only the Markdown half runs on a push; the
+PDF pairing needs a pull request, so a commit straight to `main` is still on you.
 
 **Paths in the formulation use `\nolinkurl`, not `\texttt`.** A config path is a
 long typewriter string with no breakpoints TeX will take, and `\texttt` cannot
@@ -150,10 +188,13 @@ the carve-out: shipping a fixture needs a negation rule, and a broad one
 files. This is the same decision `.gitignore` already annotates for
 `docs/formulation.pdf` — tracked deliberately at 405 kB because a reader needs
 it, and that is also the scale this rule is drawn at: a clone stays seconds, not
-minutes. Redistribution terms differ per source and none has been read here.
-Read the one you are about to use before committing anything that came from it,
-and record what it says in the README beside "Reserve market price provenance is
-unresolved" rather than summarising it here as settled.
+minutes. Redistribution terms differ per source. SMARD's has been read and is
+recorded in the README's "Data provenance" section — CC BY 4.0, credit
+`Bundesnetzagentur | SMARD.de` — which is what makes the fixtures under
+`tests/data/smard/` committable at all. regelleistung.net and netztransparenz
+have not been read. Read the one you are about to use before committing anything
+that came from it, and record what it says in that same README section rather
+than summarising it here as settled.
 
 **Price fixtures must carry the pathological cases.** `data/prices.py` hardcodes
 `HOURS_PER_YEAR = 8760` and builds the series with `np.arange`, which is true of
@@ -161,8 +202,12 @@ the synthetic generator and false of DE-LU: March has a 23-hour day, October a
 25-hour day with a duplicated local hour, and SMARD exports carry missing and
 revised values. A fixture cut as the first N rows is a clean January window, so a
 passing loader test proves the parser runs and nothing about whether it is right.
-Choose fixture windows to contain those cases, and say in the filename or a
-comment which one each carries.
+Two such weeks are committed under `tests/data/smard/`, each named for the case
+it carries: the 23-hour day of 31 March 2024, and the 25-hour day of 27 October
+2024, which also holds the duplicated local hour and 20 negative prices. Neither
+contains a real null, so the gap branch in `smard.load_quarter_hourly` is
+exercised only by a null the test injects. Follow that naming for the week that
+finally fixes it.
 
 **Commit messages carry the reasoning**, not just the change: what was ambiguous
 or wrong, why the chosen fix beats the alternative, and which numbers are
