@@ -503,7 +503,7 @@ scenario file and states the identities that check them.
 
 \subsection{What the reported figures exclude}
 
-The summary carries four caveats. They are not decoration on the output; they
+The summary carries five caveats. They are not decoration on the output; they
 are the difference between what the scenario describes and what the model
 computes, and each is a restatement in operational terms of a boundary already
 drawn in this document.
@@ -524,10 +524,12 @@ drawn in this document.
         permitted augmentation events spent, so the closing years book revenue
         from a pack past end of life. The summary reports the year; the metrics
         are not corrected for it.
-  \item \textbf{Synthetic prices.} \nolinkurl{market.price_source} is
-        \texttt{synthetic}, and the alternatives raise rather than silently
-        degrade. The figures measure the price generator of
-        \nolinkurl{data/prices.py}, not the German market.
+  \item \textbf{Synthetic prices by default.} \nolinkurl{market.price_source}
+        is \texttt{synthetic}, so the figures measure the price generator of
+        \nolinkurl{data/prices.py} rather than the German market.
+        \texttt{smard} fetches real DE-LU day-ahead prices through
+        \nolinkurl{data/smard.py}; \texttt{entsoe} remains unimplemented and
+        raises rather than silently degrading.
   \item \textbf{Short runs are not annualised.} \texttt{-{}-days N} models the
         first $N$ days of the series, which begin in January. January carries
         the narrowest spreads in the synthetic year, so pro-rating a short run

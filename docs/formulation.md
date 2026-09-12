@@ -463,7 +463,7 @@ that check them.
 
 ## What the reported figures exclude
 
-The summary carries four caveats. They are not decoration on the output;
+The summary carries five caveats. They are not decoration on the output;
 they are the difference between what the scenario describes and what the
 model computes, and each is a restatement in operational terms of a
 boundary already drawn in this document.
@@ -486,9 +486,11 @@ boundary already drawn in this document.
   from a pack past end of life. The summary reports the year; the
   metrics are not corrected for it.
 
-- **Synthetic prices.** `market.price_source` is `synthetic`, and the
-  alternatives raise rather than silently degrade. The figures measure
-  the price generator of `data/prices.py`, not the German market.
+- **Synthetic prices by default.** `market.price_source` is `synthetic`,
+  so the figures measure the price generator of `data/prices.py` rather
+  than the German market. `smard` fetches real DE-LU day-ahead prices
+  through `data/smard.py`; `entsoe` remains unimplemented and raises
+  rather than silently degrading.
 
 - **Short runs are not annualised.** `--days N` models the first $`N`$
   days of the series, which begin in January. January carries the

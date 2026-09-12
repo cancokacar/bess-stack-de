@@ -222,6 +222,7 @@ scenarios/     # scenario definitions (YAML)
 scripts/       # measurement and reporting entry points, run by hand
 docs/          # written model: formulation.tex is canonical, .md is generated
 tests/
+.github/       # CI: lint and tests, plus the checks that keep docs/ honest
 ```
 
 The optimization model is written out in [docs/formulation.tex](docs/formulation.tex):
@@ -262,7 +263,7 @@ Dispatch
   equivalent full cycles         576.3
 ```
 
-The full output carries four caveats, and they are the point of the command rather
+The full output carries five caveats, and they are the point of the command rather
 than decoration on it:
 
 - **Day-ahead only.** `revenue_streams.fcr` and `revenue_streams.afrr` are enabled in
