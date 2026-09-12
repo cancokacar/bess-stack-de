@@ -113,10 +113,10 @@ https://www.smard.de/app/chart_data/4169/DE-LU/4169_DE-LU_quarterhour_<timestamp
 ```
 
 Filter `4169` is the wholesale day-ahead price, region `DE-LU`, resolution
-`quarterhour`. The index returns weekly start timestamps in epoch milliseconds
-covering 2018-10-01 onward — the DE/LU market area's start date — so two calendar
-years is roughly 104 requests. Verified by probe, not inferred from
-documentation.
+`quarterhour`. The index returns 415 weekly start timestamps in epoch
+milliseconds covering 2018-10-01 onward — the DE/LU market area's start date —
+so two calendar years is roughly 104 requests. Verified by fetching it, not
+inferred from documentation.
 
 ### Reserve — regelleistung.net (the four German TSOs)
 

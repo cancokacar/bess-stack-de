@@ -17,6 +17,9 @@ dependencies = [
     # LpProblem.add_variable, the API that survives PuLP 4.0.
     "pulp>=3.3",
     "highspy>=1.7",
+    # CA bundle for the SMARD fetch. Python installs on macOS routinely ship
+    # without a usable one, which turns every fetch into CERTIFICATE_VERIFY_FAILED.
+    "certifi",
 ]
 
 [project.optional-dependencies]

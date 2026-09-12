@@ -64,10 +64,14 @@ def upsample(hourly: np.ndarray, steps_per_hour: int) -> np.ndarray:
 def day_ahead_prices(scenario: Scenario, hours: int | None = None) -> np.ndarray:
     """Day-ahead prices at the scenario's market resolution."""
     source = scenario.market.price_source
+    if source == "smard":
+        from .smard import day_ahead_prices as smard_day_ahead_prices
+
+        return smard_day_ahead_prices(scenario, hours=hours)
     if source != "synthetic":
         raise NotImplementedError(
             f"market.price_source '{source}' is declared in the schema but not implemented; "
-            "only 'synthetic' is available"
+            "only 'synthetic' and 'smard' are available"
         )
     hourly = synthetic_day_ahead_hourly(scenario.market.year)
     if hours is not None:
