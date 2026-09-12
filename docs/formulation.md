@@ -443,20 +443,23 @@ trigger.
 ## Reference case
 
 Measured on the reference scenario over a full synthetic year, not
-illustrative:
+illustrative. The summary rounds for display; the exact values are given
+alongside because Section 5 checks arithmetic against them.
 
-| Quantity               |       Value |
-|:-----------------------|------------:|
-| Gross revenue          | 473,374 EUR |
-| Degradation cost       |  46,104 EUR |
-| Net revenue            | 427,270 EUR |
-| Energy discharged      |  11,526 MWh |
-| Energy charged         |  13,565 MWh |
-| Equivalent full cycles |       576.3 |
+| Quantity               |  As printed |        Exact |
+|:-----------------------|------------:|-------------:|
+| Gross revenue          | 473,374 EUR | 473,373.8047 |
+| Degradation cost       |  46,104 EUR |  46,103.5848 |
+| Net revenue            | 427,270 EUR | 427,270.2200 |
+| Energy discharged      |  11,526 MWh |  11,525.8962 |
+| Energy charged         |  13,565 MWh |  13,565.0702 |
+| Equivalent full cycles |       576.3 |     576.2948 |
 
 The gap between energy charged and energy discharged is round-trip loss
 plus the idle loss $`L`$ of (2.5), and is the physical content of the
-efficiency asymmetry described under constraint group B2.
+efficiency asymmetry described under constraint group B2. Section 5
+traces these figures back to the scenario file and states the identities
+that check them.
 
 ## What the reported figures exclude
 
@@ -490,3 +493,155 @@ Network charges are reported separately and are zero in every year of
 the reference case, for the reason given in Section 2.7: the exemption
 of §118(6) EnWG runs to 2044 and the modelled life is 2025–2044, so no
 project year is charged.
+
+# Worked Example: How the Reference Case Is Computed
+
+This section traces the figures of Section 4.3 from the scenario file to
+the printed summary, and states the identities that check them. It
+exists so the numbers can be audited without running the model, and so
+that a change which breaks one of the identities is visibly a change
+rather than a new number.
+
+## Derived constants
+
+Nothing below is a scenario field. Each is computed from one or more
+fields at load or at solve time, and each enters the model in that
+derived form.
+
+| Symbol | Derivation | Value |
+|:---|:---|---:|
+| $`\Delta t`$ | `market.resolution_minutes` expressed in hours | 0.25 h |
+| $`N`$ | $`8760 / \Delta t`$ | 35,040 |
+| $`\bar{P}`$ | lesser of `battery.power_mw` and `grid.connection_limit_mw` | 10 MW |
+| $`E^{\min}`$ | `battery.soc.min` $`\times\, E^{\text{nom}}`$ | 1.0 MWh |
+| $`E^{\max}`$ | `battery.soc.max` $`\times\, E^{\text{nom}}`$ | 19.0 MWh |
+| $`E_{\text{init}}`$ | `battery.soc.initial` $`\times\, E^{\text{nom}}`$ | 10.0 MWh |
+| $`E^{\text{term}}`$ | `dispatch.terminal_soc_fraction` $`\times\, E^{\text{nom}}`$ | 10.0 MWh |
+| $`m`$ | `day_ahead.product_resolution_minutes` over `market.resolution_minutes` | 4 steps |
+| $`h`$ | `dispatch.horizon_hours` $`/ \Delta t`$ | 144 steps |
+| $`c`$ | `dispatch.commit_step_hours` $`/ \Delta t`$ | 16 steps |
+| $`L`$ | $`(\sigma E^{\text{nom}} / 24 + P^{\text{aux}}) \Delta t`$ | 0.01270833 MWh |
+| $`\kappa`$ | $`1 - {}`$`day_ahead.spread_haircut` | 1 |
+
+## The price series
+
+`synthetic_day_ahead_hourly` returns 8760 hourly prices, which
+`upsample` repeats four times each to give the 35,040 quarter-hourly
+values the model consumes. Day-ahead settles hourly, so the price is
+constant inside each hour by construction and constraint group B4 keeps
+power constant there too.
+
+Two properties of that series matter when reading any figure derived
+from it. The generator takes a `year` argument that its body never
+references, so the series is identical for every modelled year, and the
+seed is fixed at 42 and is not exposed through the scenario file: the
+reference case rests on one fixed realisation rather than a draw. And
+the calendar is synthetic. 8760 hours is exactly 365 days with no leap
+handling, and the weekday index is the day number modulo seven, so
+weekends fall on a repeating cycle that is not aligned to the modelled
+year’s real calendar.
+
+## Window bookkeeping
+
+Windows start at every $`c`$-th step, giving $`35{,}040 / 16 = 2190`$
+windows. Each solves $`h = 144`$ steps and commits the leading
+$`c = 16`$, and $`2190 \times 16`$ recovers exactly 35,040, so every
+step is committed once and none twice.
+
+The terminal target of constraint B5 is applied only where a window is
+longer than the committed region. The last window begins at step 35,024
+and is exactly 16 steps long, so it receives none, and the battery is
+free to end the year empty. It does: $`E_{N-1} = 1.0`$ MWh, the lower
+bound. That is the end effect B5 exists to contain, visible here because
+the final window is the one place it cannot act.
+
+## The objective in the reference case
+
+The reference scenario sets $`\kappa = 1`$ and
+$`f = g^{c} = g^{d} = 0`$, so the captured and paid prices of (2.1) both
+collapse to the raw price, and the sell and buy coefficient vectors
+become the same array. The objective reduces to
+
+``` math
+\max \; \sum_{t \in \mathcal{T}}
+  \Big[ \big( \pi_t - c^{\deg} \big) P^{d}_{t} - \pi_t P^{c}_{t} \Big] \Delta t ,
+```
+
+with $`c^{\deg} = 4`$ EUR/MWh the only term that distinguishes the two
+directions. A step priced at 108.75 EUR/MWh therefore costs 108.75 to
+charge and earns 104.75 to discharge. Setting $`c^{\deg}`$ to zero as
+well would reduce (5.1) exactly to the gross revenue of (4.1), which is
+the sense in which gross revenue is this objective with degradation
+switched off.
+
+## Identities that check the reported figures
+
+Three relations must hold exactly. They are worth re-running after any
+change to the objective or to constraint group B2, because each fails
+loudly rather than drifting.
+
+First, degradation cost is throughput priced at $`c^{\deg}`$:
+$`4.0 \times 11{,}525.8962 = 46{,}103.5848`$.
+
+Second, net revenue is gross less that cost:
+$`473{,}373.8047 - 46{,}103.5848 = 427{,}270.2199`$, printed as
+427,270.22.
+
+Third, and the strongest of the three, the year’s energy balance closes:
+
+``` math
+E_{\text{init}}
+  + \eta^{c} \textstyle\sum_t P^{c}_{t} \Delta t
+  - \frac{1}{\eta^{d}} \textstyle\sum_t P^{d}_{t} \Delta t
+  - N L
+  \;=\; E_{N-1}
+```
+
+Numerically
+$`10.0 + 12{,}724.0358 - 12{,}287.7358 - 445.3000 = 1.0000`$, against an
+observed final state of charge of 1.0000 MWh, for a residual of zero to
+eight decimal places. This is a stronger check than the first two,
+because it ties the charging and discharging sums, both efficiencies,
+the idle loss and the initial and final states into a single equation:
+an error in any one of them breaks it.
+
+Two further properties were confirmed on the same run. State of charge
+stayed within $`[1.0, 19.0]`$ MWh, touching both bounds, and no step
+carried simultaneous charging and discharging, which is what constraint
+group B1 exists to prevent.
+
+## What the cycle count counts
+
+Equivalent full cycles divide discharged energy by nominal capacity, and
+both halves of that ratio are conventions rather than facts.
+
+| Basis for the numerator                   | Energy (MWh) |   Cycles |
+|:------------------------------------------|-------------:|---------:|
+| Discharged, measured at the grid *(used)* |  11,525.8962 | 576.2948 |
+| Discharged, measured at the cells         |  12,287.7358 | 614.3868 |
+| Charged, measured at the grid             |  13,565.0702 | 678.2535 |
+
+The numerator is discharged rather than charged energy, which is
+consistent: degradation is charged per MWh discharged, so the cycle
+count and the degradation cost share a numerator.
+
+The denominator is nominal capacity, not the 18 MWh the state-of-charge
+band actually permits. A full traverse of that band is therefore 0.90
+equivalent full cycles, and the battery cannot perform one whole cycle
+in a single pass. This is consistent with how fade is defined — fade per
+cycle is a fraction of beginning-of-life capacity, and one equivalent
+full cycle discharges exactly that — but it does mean 576.29 cycles
+never occurred as 576 traversals. They are the sum of many partial ones,
+at an average of 1.58 per day.
+
+The remaining choice is open. Throughput is measured at the grid, so
+delivering 11,525.8962 MWh required drawing
+$`11{,}525.8962 / \eta^{d} = 12{,}287.7358`$ MWh from the cells. Cell
+degradation physically tracks what passes through the cells, which is
+6.61% more than what is counted here. Whether that is correct depends on
+how `degradation.cyclic_fade_per_full_cycle` was calibrated: against
+energy delivered, in which case the model is consistent, or against cell
+throughput, in which case fade is understated by that margin and the
+augmentation trigger fires later than it should. The scenario file does
+not say which, and until it does this is a known uncertainty of about
+6.6% in the cycle count and in everything keyed to it.
