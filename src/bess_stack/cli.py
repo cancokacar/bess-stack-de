@@ -37,6 +37,8 @@ import yaml
 
 from bess_stack.config import Scenario, ScenarioError
 from bess_stack.data.prices import day_ahead_prices
+from bess_stack.finance import cashflow
+from bess_stack.finance.cashflow import CashflowError
 from bess_stack.finance.grid_fees import (
     annual_grid_fee_charges,
     first_charged_year,
@@ -188,19 +190,59 @@ def _network_charge_lines(scenario: Scenario, result: DispatchResult) -> list[st
     return lines
 
 
-def _not_computed_lines(scenario: Scenario) -> list[str]:
-    metrics = scenario.raw.get("outputs", {}).get("metrics", [])
-    lines = ["Not computed"]
-    if metrics:
-        # Read from the file rather than hardcoded, so this stays true if the list
-        # changes, and so the names appear verbatim -- no bare "irr" is ever emitted.
-        body = (
-            f"outputs.metrics names {_join([str(m) for m in metrics])}. Nothing in "
-            "finance/ computes them, so this stops at annual net revenue."
+def _format_metric(name: str, value: float | None) -> str:
+    if value is None:
+        # None means no sign change in the flows. Printing 0 % would read as
+        # break-even, which is the opposite of what it means.
+        return _row_text(name, "never pays back" if name == "payback_years" else "none")
+    if name.startswith("irr"):
+        return _row_text(name, f"{value * 100:,.2f} %")
+    if name == "payback_years":
+        return _row_text(name, f"{value:,.1f} y")
+    if name == "lcos_eur_per_mwh":
+        return _row_text(name, f"{value:,.2f} EUR/MWh")
+    return _row_text(name, f"{value:,.0f} EUR")
+
+
+def _row_text(label: str, text: str) -> str:
+    return f"  {label:<{LABEL_WIDTH}}{text:>{VALUE_WIDTH}}"
+
+
+def _return_lines(scenario: Scenario, result: DispatchResult) -> list[str]:
+    """Return metrics, or the reason there are none."""
+    metrics = [str(m) for m in scenario.raw.get("outputs", {}).get("metrics", [])]
+    if not metrics:
+        return []
+    try:
+        cf = cashflow.build(scenario, result)
+    except CashflowError as exc:
+        # A short run cannot become a project. Say why rather than omitting the block.
+        return ["Returns"] + _wrap(
+            f"Not computed: {exc}. Re-run without --days for the full year.", indent="  "
         )
-    else:
-        body = "No return metrics are computed; this stops at annual net revenue."
-    lines += _wrap(f"{body} Do not read the net revenue above as a return.", indent="  ")
+
+    lines = ["Returns"]
+    lines += [_format_metric(name, cf.metric(name)) for name in metrics]
+    lines.append("")
+    lines += _wrap(
+        f"Unlevered and stated on finance.basis '{scenario.finance.basis}'. The degradation "
+        "charge in the dispatch objective is a shadow price, not cash, so it does not appear "
+        "here; the cash consequence of cycling is the augmentation spend. One modelled year "
+        "is repeated across the life with its margin scaled by remaining capacity.",
+        indent="  ",
+    )
+    past = cf.first_past_end_of_life_year
+    if past is not None:
+        lines.append("")
+        lines += _wrap(
+            f"Capacity falls below degradation.end_of_life_capacity_fraction "
+            f"({scenario.degradation.end_of_life_capacity_fraction:g}) in {past}, and the "
+            f"{scenario.degradation.augmentation.max_events} permitted augmentation events "
+            "are spent before then. Every year from that point books revenue from a pack "
+            "past its own end of life, so the metrics above are optimistic by an amount this "
+            "model does not estimate.",
+            indent="  ",
+        )
     return lines
 
 
@@ -216,7 +258,7 @@ def summary_lines(
         _unmodelled_lines(scenario),
         _dispatch_lines(scenario, result),
         _network_charge_lines(scenario, result),
-        _not_computed_lines(scenario),
+        _return_lines(scenario, result),
         [f"Total {elapsed_s:.0f} s."],
     ]
     lines: list[str] = []

@@ -473,10 +473,18 @@ boundary already drawn in this document.
   implemented, so every figure is the day-ahead leg alone and
   understates the stack the scenario describes.
 
-- **No return metrics.** Nothing in `finance/` computes the quantities
-  `outputs.metrics` names, so the summary stops at annual net revenue.
-  That number is not a return: it is gross margin before capital cost,
-  tax and financing.
+- **Returns repeat one modelled year.** `finance/cashflow.py` computes
+  the quantities `outputs.metrics` names, but from a single solved year
+  whose margin is scaled by remaining capacity rather than from a
+  year-by-year re-solve. The scaling is linear in usable energy, which
+  is conservative, because the cycles a smaller battery declines are its
+  least valuable ones.
+
+- **The reference case outlives its own battery.** Capacity crosses
+  `degradation.end_of_life_capacity_fraction` in 2041 with both
+  permitted augmentation events spent, so the closing years book revenue
+  from a pack past end of life. The summary reports the year; the
+  metrics are not corrected for it.
 
 - **Synthetic prices.** `market.price_source` is `synthetic`, and the
   alternatives raise rather than silently degrade. The figures measure

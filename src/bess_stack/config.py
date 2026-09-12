@@ -351,6 +351,108 @@ class Grid:
 
 
 @dataclass(frozen=True)
+class Depreciation:
+    method: str
+    years: int
+    capitalise_augmentation: bool
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> Depreciation:
+        return cls(
+            method=str(d.get("method", "straight_line")),
+            years=int(d.get("years", 20)),
+            capitalise_augmentation=bool(d.get("capitalise_augmentation", True)),
+        )
+
+    def validate(self) -> None:
+        if self.method != "straight_line":
+            raise ScenarioError(
+                f"finance.depreciation.method '{self.method}' is not implemented; only "
+                "'straight_line' exists"
+            )
+        if self.years <= 0:
+            raise ScenarioError("finance.depreciation.years must be positive")
+
+
+@dataclass(frozen=True)
+class Debt:
+    enabled: bool
+    share_of_capex: float
+    interest_rate: float
+    tenor_years: int
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> Debt:
+        return cls(
+            enabled=bool(d.get("enabled", False)),
+            share_of_capex=float(d.get("share_of_capex", 0.0)),
+            interest_rate=float(d.get("interest_rate", 0.0)),
+            tenor_years=int(d.get("tenor_years", 0)),
+        )
+
+
+@dataclass(frozen=True)
+class Finance:
+    basis: str
+    inflation_per_year: float
+    capex_eur_per_kwh: float
+    capex_fixed_eur: float
+    opex_eur_per_kw_year: float
+    opex_real_escalation_per_year: float
+    discount_rate: float
+    project_lifetime_years: int
+    residual_value_fraction: float
+    tax_rate: float
+    loss_carryforward: bool
+    depreciation: Depreciation
+    debt: Debt
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> Finance:
+        return cls(
+            basis=str(d.get("basis", "real")),
+            inflation_per_year=float(d.get("inflation_per_year", 0.0)),
+            capex_eur_per_kwh=float(_require(d, "capex_eur_per_kwh", "finance")),
+            capex_fixed_eur=float(d.get("capex_fixed_eur", 0.0)),
+            opex_eur_per_kw_year=float(_require(d, "opex_eur_per_kw_year", "finance")),
+            opex_real_escalation_per_year=float(d.get("opex_real_escalation_per_year", 0.0)),
+            discount_rate=float(_require(d, "discount_rate", "finance")),
+            project_lifetime_years=int(_require(d, "project_lifetime_years", "finance")),
+            residual_value_fraction=float(d.get("residual_value_fraction", 0.0)),
+            tax_rate=float(d.get("tax_rate", 0.0)),
+            loss_carryforward=bool(d.get("loss_carryforward", False)),
+            depreciation=Depreciation.from_dict(d.get("depreciation", {})),
+            debt=Debt.from_dict(d.get("debt", {})),
+        )
+
+    def validate(self) -> None:
+        if self.basis not in {"real", "nominal"}:
+            raise ScenarioError(f"unknown finance.basis '{self.basis}'")
+        if self.basis == "nominal":
+            raise ScenarioError(
+                "finance.basis 'nominal' is declared in the schema but not implemented. "
+                "Every monetary field, discount_rate and opex escalation would have to be "
+                "restated together, and half-converting is the error the basis field exists "
+                "to prevent"
+            )
+        if self.project_lifetime_years <= 0:
+            raise ScenarioError("finance.project_lifetime_years must be positive")
+        if not 0.0 <= self.tax_rate < 1.0:
+            raise ScenarioError("finance.tax_rate must be in [0, 1)")
+        if self.discount_rate <= -1.0:
+            raise ScenarioError("finance.discount_rate must exceed -1")
+        if not 0.0 <= self.residual_value_fraction <= 1.0:
+            raise ScenarioError("finance.residual_value_fraction must be in [0, 1]")
+        if self.debt.enabled:
+            raise ScenarioError(
+                "finance.debt.enabled is true, but only unlevered project IRR is "
+                "implemented. Reporting a levered return from an unlevered model would "
+                "be wrong in the flattering direction"
+            )
+        self.depreciation.validate()
+
+
+@dataclass(frozen=True)
 class Scenario:
     name: str
     battery: Battery
@@ -359,8 +461,12 @@ class Scenario:
     dispatch: Dispatch
     day_ahead: DayAhead
     grid: Grid
-    project_lifetime_years: int
+    finance: Finance
     raw: dict[str, Any]
+
+    @property
+    def project_lifetime_years(self) -> int:
+        return self.finance.project_lifetime_years
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Scenario:
@@ -374,9 +480,7 @@ class Scenario:
             dispatch=Dispatch.from_dict(_require(d, "dispatch", "<root>")),
             day_ahead=DayAhead.from_dict(_require(streams, "day_ahead", "revenue_streams")),
             grid=Grid.from_dict(_require(d, "grid", "<root>")),
-            project_lifetime_years=int(
-                _require(finance, "project_lifetime_years", "finance")
-            ),
+            finance=Finance.from_dict(finance),
             raw=d,
         )
         scenario.validate()
@@ -393,5 +497,6 @@ class Scenario:
         self.degradation.validate(self.project_lifetime_years)
         self.dispatch.validate(self.battery)
         self.day_ahead.validate(self.market)
+        self.finance.validate()
         if self.grid.connection_limit_mw <= 0:
             raise ScenarioError("grid.connection_limit_mw must be positive")

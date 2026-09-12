@@ -268,10 +268,18 @@ than decoration on it:
 - **Day-ahead only.** `revenue_streams.fcr` and `revenue_streams.afrr` are enabled in
   the reference scenario but `model.dispatch` does not implement them, so the figures
   are the day-ahead leg alone and understate the stack the scenario describes.
-- **No return metrics.** Nothing in `finance/` computes the `outputs.metrics` the
-  scenario names, so this stops at annual net revenue. That number is not a return.
-- **Synthetic prices.** `market.price_source` is `synthetic`; `entsoe` and `smard`
-  raise. The figures measure the price generator, not the German market.
+- **Returns repeat one modelled year.** `finance/cashflow.py` computes the
+  `outputs.metrics` the scenario names, but from a single solved year whose margin
+  is scaled by remaining capacity, not from a year-by-year re-solve. Revenue is
+  scaled linearly with usable energy, which is conservative: the cycles a smaller
+  battery declines are its least valuable.
+- **The reference case outlives its own battery.** Capacity crosses
+  `degradation.end_of_life_capacity_fraction` in 2041 with both permitted
+  augmentation events already spent, so the last four years book revenue from a
+  pack past end of life. The summary says so; the metrics do not correct for it.
+- **Synthetic prices by default.** `market.price_source` is `synthetic`, so the
+  headline figures measure the price generator rather than the German market.
+  `smard` fetches real DE-LU prices; `entsoe` still raises.
 - **Short runs are not annualised.** `--days N` models the first N days, which start
   in January — the narrowest spreads in the synthetic series — so pro-rating a short
   run understates the year. A week pro-rates to about 310,000 EUR against the

@@ -66,11 +66,27 @@ empties the battery into the last step of every window.
 
 **What is not built yet.** FCR and aFRR appear in the scope sentence and the
 scenario schema but not in `model.dispatch` — day-ahead is the only stream
-optimised. `finance/` contains only `grid_fees.py`; nothing computes the NPV or
-IRR metrics that `outputs.metrics` names. `cli` therefore prints day-ahead-only
-figures, and says so in a caveat placed *above* them, naming the enabled streams it
-cannot model and the metrics nothing computes. Those lines are load-bearing rather
-than a stale note: they are what stops the net revenue reading as a return.
+optimised, and `config.py` has no dataclass for either. `cli` therefore prints
+day-ahead-only figures and says so in a caveat placed *above* them. Those lines
+are load-bearing rather than a stale note: they are what stops the net revenue
+reading as a return.
+
+**Returns are computed, and carry their own caveats.** `finance/cashflow.py`
+produces every name in `outputs.metrics`. Three things about it are deliberate.
+`build()` refuses a dispatch result that is not a full year rather than
+annualising it, because the series starts in January and January has the
+narrowest spreads. An absent IRR is reported as `None`, never as zero, because
+zero reads as break-even. And the degradation charge never enters the cashflow:
+it is a shadow price that shapes dispatch, and the cash consequence of cycling is
+the augmentation spend, so carrying both would count the same wear twice.
+
+`ProjectCashflow.first_past_end_of_life_year` answers the question
+`Degradation.validate` explicitly cannot. That check sees calendar fade only,
+because cyclic fade depends on the cycle count and the cycle count is an outcome
+of dispatch. The cashflow is the first place the real trajectory exists. It
+reports rather than raises: the reference case crosses end of life in 2041 with
+both augmentation events spent, and the run is still informative provided the
+reader is told.
 
 ## Conventions
 

@@ -27,14 +27,26 @@ def result_priced(gross_eur: float, discharged_mwh: float, charged_mwh: float) -
 
     Discharge and charge sit in separate steps so the price applies to one leg at a
     time; the price is chosen to make gross revenue land exactly on `gross_eur`.
+
+    Padded to a full year of idle steps at zero price. The padding changes none of
+    the totals, and it is what lets the report's return block build: a project
+    cashflow refuses anything that is not a year, precisely so a short run cannot
+    be annualised by accident.
     """
     dt = 0.25
+    steps = 35_040
     price = gross_eur / discharged_mwh
+    charge = np.zeros(steps)
+    discharge = np.zeros(steps)
+    prices = np.zeros(steps)
+    discharge[0] = discharged_mwh / dt
+    prices[0] = price
+    charge[1] = charged_mwh / dt
     return DispatchResult(
-        charge_mw=np.array([0.0, charged_mwh / dt]),
-        discharge_mw=np.array([discharged_mwh / dt, 0.0]),
-        soc_mwh=np.zeros(2),
-        prices_eur_per_mwh=np.array([price, 0.0]),
+        charge_mw=charge,
+        discharge_mw=discharge,
+        soc_mwh=np.zeros(steps),
+        prices_eur_per_mwh=prices,
         resolution_hours=dt,
         degradation_cost_eur_per_mwh=4.0,
     )
@@ -112,8 +124,10 @@ def test_unmodelled_caveat_disappears_when_the_streams_are_off(raw):
     result = result_priced(473_374.0, discharged_mwh=11_526.0, charged_mwh=13_565.0)
     text = "\n".join(summary_lines(s, result, days=None, elapsed_s=81.0))
     assert "Day-ahead only" not in text
-    # The metrics disclaimer is unconditional and must survive.
-    assert "Do not read the net revenue above as a return." in text
+    # The returns disclaimer is unconditional and must survive: whatever the
+    # streams are doing, the degradation charge is still a shadow price and the
+    # reader still needs telling it is not cash.
+    assert "shadow price, not cash" in text
 
 
 def test_metric_names_are_printed_verbatim_so_no_bare_irr_appears(scenario):
