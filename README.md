@@ -35,9 +35,12 @@ Simplifications inside the modelled scope that a reader should price in:
 - **Perfect foresight is the default.** `dispatch.forecast.kind: perfect` makes
   reported arbitrage revenue an upper bound, not an expectation. The
   forecast-error modes exist in the schema but are uncalibrated.
-- **Reserve market price provenance is unresolved.** `market.price_source`
-  covers day-ahead only; FCR and aFRR clearing results come from a separate
-  source and are currently placeholders.
+- **Reserve market prices cannot yet be redistributed.** Day-ahead provenance is
+  settled — SMARD publishes under CC BY 4.0 — but the FCR and aFRR figures in
+  `reference.yaml` remain invented placeholders, because regelleistung.net
+  publishes its tender results under an all-rights-reserved notice with no open
+  licence. This is a permission question, not an availability one. See
+  [Data provenance](#data-provenance).
 - **The grid fee exemption may not survive the horizon.**
   `grid.grid_fee_exemption_until_year` is set to 2044, the last exempt year of
   the 20 years from a 2025 commissioning under section 118(6) EnWG — exactly
@@ -87,6 +90,68 @@ Simplifications inside the modelled scope that a reader should price in:
   Hebesatz, and the depreciation life is a placeholder rather than a confirmed
   AfA figure, so `irr_post_tax` will move once the site and tax life are fixed.
   Both IRRs are reported by name; neither is quoted as plain "IRR".
+
+## Data provenance
+
+Two sources, two very different licensing positions. The distinction decides what
+may enter this repository, so it is recorded here verbatim rather than
+summarised. Neither licence has been reviewed by a lawyer and nothing below is a
+legal opinion.
+
+### Day-ahead — SMARD (Bundesnetzagentur)
+
+Licensed **CC BY 4.0**, stated on <https://www.smard.de/en/datennutzung>, which
+permits redistribution and commercial use with attribution. The required credit
+is `Bundesnetzagentur | SMARD.de`. The Bundesnetzagentur disclaims
+responsibility for the correctness and completeness of the data.
+
+Fetched from the unauthenticated chart API, one JSON file per week:
+
+```
+https://www.smard.de/app/chart_data/4169/DE-LU/index_quarterhour.json
+https://www.smard.de/app/chart_data/4169/DE-LU/4169_DE-LU_quarterhour_<timestamp>.json
+```
+
+Filter `4169` is the wholesale day-ahead price, region `DE-LU`, resolution
+`quarterhour`. The index returns weekly start timestamps in epoch milliseconds
+covering 2018-10-01 onward — the DE/LU market area's start date — so two calendar
+years is roughly 104 requests. Verified by probe, not inferred from
+documentation.
+
+### Reserve — regelleistung.net (the four German TSOs)
+
+The data exists and is downloadable. The [Datacenter](https://www.regelleistung.net/apps/datacenter/tenders/)
+publishes Demands, Results and an Anonymous list of bids as XLSX for FCR, aFRR,
+mFRR and ABLA, capacity and energy. FCR capacity clears in six four-hour blocks
+(`NEGPOS_00_04` through `NEGPOS_20_24`), which is the structure
+`revenue_streams.fcr.block_hours` already assumes.
+
+What is missing is a licence. The [imprint](https://www.regelleistung.net/en-us/Imprint)
+states:
+
+> Contents and design of this website are protected by copyright. Reproduction
+> of the website or parts thereof including but not limited to the contents of
+> individual pages requires prior written permission from the German TSOs unless
+> reproduction is authorised by law.
+
+The site is operated jointly by 50Hertz Transmission GmbH, Amprion GmbH, TenneT
+TSO GmbH and TransnetBW GmbH. There is no Creative Commons grant to point at, and
+the stated default is restrictive.
+
+**Consequence for this repository: no regelleistung-derived file may be
+committed — not a fixture, not a sample, not a cached extract — until that
+permission question has an answer.** Reading the data locally to calibrate is a
+separate act from redistributing it, and only the second is blocked here.
+Whether factual clearing prices attract copyright at all, whether the sui generis
+database right applies, and whether the TSOs' publication obligation amounts to a
+reuse permission are questions for someone qualified, not for this file.
+
+One practical unknown remains: whether a date-range bulk export exists. The
+Datacenter is a single-page app whose filter reads "Delivery day", singular, and
+FCR tenders daily, so per-tender download would mean roughly 730 files for two
+years. A programmatic route does appear to exist —
+`/apps/cpp-publisher/api/v1/download/tenders/…` answers HTTP 400 rather than 404,
+so the endpoint is real and the parameters were wrong.
 
 ## Prior art
 
