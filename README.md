@@ -1,6 +1,6 @@
 # bess-stack-de
 
-[![CI](https://github.com/Canny95/bess-stack-de/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Canny95/bess-stack-de/actions/workflows/ci.yml)
+[![CI](https://github.com/cancokacar/bess-stack-de/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/cancokacar/bess-stack-de/actions/workflows/ci.yml)
 
 Revenue-stacking model for battery energy storage systems (BESS) in Germany.
 
